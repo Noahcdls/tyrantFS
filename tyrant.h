@@ -3,6 +3,9 @@
 #include <unistd.h>
 #include <string.h>
 
+
+#define BLOCKSIZE 4096
+#define MEMSIZE 1024*1024*1024 //1GB
 //ext4 stuff but worth copying some over
 //https://docs.kernel.org/filesystems/ext4/dynamic.html
 struct inode{
