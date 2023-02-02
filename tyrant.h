@@ -6,6 +6,9 @@
 
 #define BLOCKSIZE 4096
 #define MEMSIZE 1024*1024*1024 //1GB
+#define END_OF_INODE 3 //3 is first data block, 2 is last inode
+#define NUM_FREE_BLOCKS 64
+
 //ext4 stuff but worth copying some over
 //https://docs.kernel.org/filesystems/ext4/dynamic.html
 struct inode{
@@ -24,4 +27,5 @@ struct inode{
 
 };
 typedef struct inode node;
+
 
