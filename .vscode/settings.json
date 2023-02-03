@@ -3,6 +3,9 @@
         "stdio.h": "c",
         "fuse_common.h": "c",
         "fuse.h": "c",
-        "fuse_opt.h": "c"
+        "fuse_opt.h": "c",
+        "cmath": "c",
+        "*.tcc": "c",
+        "type_traits": "c"
     }
 }
