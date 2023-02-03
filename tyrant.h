@@ -26,8 +26,8 @@ struct inode{
     uint32_t links;//linked count
     uint32_t blocks_hi;
     uint32_t blocks_lo;//num of blocks
-    uint32_t direct_blocks[12]
-    uin32_t indirect_blocks;
+    uint32_t direct_blocks[12];
+    uint32_t indirect_blocks;
     uint32_t  dbl_indirect;
     uint32_t trpl_indirect;//holds block positions for blocks
     uint32_t flags;
