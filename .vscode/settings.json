@@ -6,6 +6,7 @@
         "fuse_opt.h": "c",
         "cmath": "c",
         "*.tcc": "c",
-        "type_traits": "c"
+        "type_traits": "c",
+        "stdint.h": "c"
     }
 }
