@@ -7,8 +7,9 @@
 /*
 @brief mkfs for tyrant DEFAULT
 @param fs_space pointer to where beginning of memory space to write over
+@note deprecated
 */
-void tfs_mkfs(void *fs_space)
+void tfs_mkfs_v1(void *fs_space)
 {
     for (int i = BLOCKSIZE; i < END_OF_INODE * BLOCKSIZE; i += INODE_SIZE_BOUNDARY)
     {
@@ -38,6 +39,46 @@ void tfs_mkfs(void *fs_space)
         }
     }
 }
+
+/*
+@brief mkfs for tyrant with define options
+@param fs_space pointer to where beginning of memory space to write over
+@return 0 on success, -1 failure
+@note future implementations could have inputs for amount of inodes and blocks depending on algorithm
+*/
+int tfs_mkfs(void *fs_space)
+{
+    if(fs_space == NULL)
+        return -1;
+    for (int i = BLOCKSIZE; i < END_OF_INODE * BLOCKSIZE; i += INODE_SIZE_BOUNDARY)
+    {
+
+        node *inode_init = fs_space + i; // set up a basic node
+        bzero(inode_init, INODE_SIZE_BOUNDARY);          // clear out inode info
+    }
+
+    *((uint32_t *)fs_space) = END_OF_INODE;                       // superblock holds first free block address
+    uint8_t *free_blockptr = fs_space + END_OF_INODE * BLOCKSIZE; // shift pointer over to his free block
+    uint64_t block_counter = END_OF_INODE;
+
+    uint64_t addr_counter = 0;
+    while(addr_counter < NUM_FREE_BLOCKS){
+        bzero(free_blockptr, BLOCKSIZE);
+        uint8_t * block_ptr = free_blockptr+BLOCKSIZE;
+        for(uint64_t i = 0; i < BLOCKSIZE; i += 8){
+            if(addr_counter >= NUM_FREE_BLOCKS)
+                break;
+            addr_counter++;
+            *(uint64_t*)(free_blockptr+i) = block_ptr;//write in address
+            block_ptr += BLOCKSIZE;
+        }
+        free_blockptr = block_ptr-BLOCKSIZE;//go back and write the last address stored
+    }
+
+    return 0;
+}
+
+
 
 /*
 @brief allocate an available inode
@@ -106,12 +147,20 @@ int write_inode(void * inode, void * buff){
 
 /*
 @brief read part or all of memory block
+@param buff buffer you want to read into
+@param block pointer to block
+@param offset byte offset to read from
+@param bytes bytes you want to read
 @return valid number of bytes read
 */
-uint32_t read_block(void *fs_space, void *buff, uint32_t block, off_t offset, uint32_t bytes)
+uint32_t read_block(void *buff, void * block, off_t offset, uint32_t bytes)
 {
-    uint8_t *start = fs_space + block * BLOCKSIZE + offset;
-    uint32_t bytes_avail = (block + 1) * BLOCKSIZE - (block * BLOCKSIZE + offset);
+    if(buff == NULL || block == NULL)
+        return 0;
+    if(offset > BLOCKSIZE || offset < 0)
+        return 0;
+    uint8_t *start = block+offset;
+    uint32_t bytes_avail = BLOCKSIZE-offset;
     if (bytes_avail < bytes)
     { // asking for more bytes than what is left so read what we can
         memcpy(buff, start, bytes_avail);
@@ -122,15 +171,25 @@ uint32_t read_block(void *fs_space, void *buff, uint32_t block, off_t offset, ui
         memcpy(buff, start, bytes);
         return bytes;
     }
+    return 0;
 }
 
 /*
-@brief write part or all of memory block
+@brief write into block
+@param buff buffer containting write data
+@param block pointer to block
+@param offset byte offset to write from
+@param bytes bytes you want to write
+@return valid number of bytes written
 */
-uint32_t write_block(void *fs_space, void *buff, uint32_t block, off_t offset, uint32_t bytes)
+uint32_t write_block(void *buff, void * block, off_t offset, uint32_t bytes)
 {
-    uint8_t *start = fs_space + block * BLOCKSIZE + offset;
-    uint32_t bytes_avail = (block + 1) * BLOCKSIZE - (block * BLOCKSIZE + offset);
+    if(buff == NULL || block == NULL)
+        return 0;
+    if(offset > BLOCKSIZE || offset < 0)
+        return 0;
+    uint8_t *start = block+offset;
+    uint32_t bytes_avail = BLOCKSIZE-offset;
     if (bytes_avail < bytes)
     { // want to write more bytes than what is left in block
         memcpy(start, buff, bytes_avail);
@@ -141,67 +200,81 @@ uint32_t write_block(void *fs_space, void *buff, uint32_t block, off_t offset, u
         memcpy(start, buff, bytes);
         return bytes;
     }
+    return 0;
 }
 
 /*
 @brief find next free block and allocate it
+@param fs_space pointer to disk/memory
+@return pointer to where block is
 */
-uint32_t allocate_block(void *fs_space)
+void * allocate_block(void *fs_space)
 {
-    uint32_t free_block = 0;
-    uint8_t *next_block = fs_space + *(uint32_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
+    uint64_t free_block = 0;
+    uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
     if (next_block == fs_space)
-        return 0; // no more free blocks since next block is super block
-    for (uint32_t i = 0; i < BLOCKSIZE; i += 4)
+        return NULL; // no more free blocks since next block is super block
+    for (uint64_t i = 0; i < BLOCKSIZE; i += 8)//8 byte addresses for large storage drives (32bit )
     {
-        free_block = *(uint32_t *)next_block;
+        free_block = *(uint64_t *)next_block;
         if (free_block != 0)
         {
-            bzero(next_block, sizeof(uint32_t)); // zero out available block
-            if (i == BLOCKSIZE - 4)
+            bzero(next_block, sizeof(uint64_t)); // zero out available block
+            if (i == BLOCKSIZE - 8)//only 1 available address. Update super block
             {
-                free_block = *(uint32_t *)fs_space;                // set free block as current block we are looking in
-                *(uint32_t *)fs_space = *(uint32_t *)(next_block); // last 4 bytes contain what to set next super block value
+                free_block = *(uint64_t *)fs_space;                // set free block as current block we are looking in
+                *(uint64_t *)fs_space = *(uint64_t *)(next_block); // last 8 bytes contain what to set next super block value
             }
-            return free_block;
+            return next_block;
         }
-        next_block = next_block + 4; // advance 4 bytes
+        next_block = next_block + 8; // advance 8 bytes
     }
-    free_block = *(uint32_t *)fs_space; // set to block given by super block since zeroed out
-    *(uint32_t *)fs_space = 0;
-    return free_block; // we only get here if block is filled with zeros meaning it was the last free block
+    //The block was completely zeroed out which means it was the only block available
+    free_block = *(uint64_t *)fs_space; // set to block given by super block since zeroed out
+    next_block = (uint64_t *)fs_space;
+    *(uint64_t *)fs_space = 0;
+    return next_block; // we only get here if block is filled with zeros meaning it was the last free block
 }
 
 /*
-@brief add a block to the free list. Returns 0 on successful return, 1 otherwise
+@brief add a block to the free list
+@param fs_space pointer to start of disk/memory
+@param block we want to free
+@return returns 0 on success, -1 on failure
+@note zeroing only occurs when we link this block as the next place to jump to (last stored addr or super block)
+This is an easy hack to reduce zero overhead since read and write pointers will prevent reading
+old data
 */
-uint32_t free_block(void *fs_space, uint32_t block)
+int free_block(void *fs_space, void * block)
 {
-    uint32_t free_block = 0;
-    uint8_t *next_block = fs_space + *(uint32_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
-    if (next_block == fs_space)
-    { // no more free blocks then add as next free block
-        *(uint32_t *)fs_space = block;
-        bzero(fs_space + block * BLOCKSIZE, BLOCKSIZE); // clear block
-        return 0;                                       // success
-    }
-    for (uint32_t i = 0; i < BLOCKSIZE; i += 4)
+    if(fs_space == NULL || block == NULL)
+        return -1;
+    uint64_t free_block = 0;
+    uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
+    if (next_block == fs_space)//Add as super block if there aren't any other free blocks
     {
-        free_block = *(uint32_t *)next_block;
+        *(uint64_t *)fs_space = block;
+        bzero(block, BLOCKSIZE); // clear block
+        return 0;// success
+    }
+    // next_block += BLOCKSIZE-8;//get to last stored address.
+    for (uint64_t i = 0; i < BLOCKSIZE; i += 8)
+    {
+        free_block = *(uint64_t *)next_block;
         if (free_block == 0) // a free spot to write in a new block
         {
-            *(uint32_t *)next_block = block; // write in block to free space
-            if (i == BLOCKSIZE - 4)
+            *(uint64_t *)next_block = block; // write in block to free space
+            if (i == BLOCKSIZE-8)//first address at end
             {
-                bzero(fs_space + block * BLOCKSIZE, BLOCKSIZE); // zero if we are set up to jump here
+                bzero(block, BLOCKSIZE); // zero if we are set up to jump here
             }
             return 0;
         }
-        next_block = next_block + 4; // advance 4 bytes
+        next_block = next_block + 8; // advance 8 bytes
     }
     // if the whole block is full, make block next super block with link to the full one
-    bzero(fs_space + block * BLOCKSIZE, BLOCKSIZE);
-    *(uint32_t *)(fs_space + (block + 1) * BLOCKSIZE - 4) = *(uint32_t *)fs_space; // write in old super block to link to
-    *(uint32_t *)fs_space = block;
+    bzero(block, BLOCKSIZE);
+    *(uint64_t *)(block+BLOCKSIZE-8) = *(uint64_t *)fs_space; //last address in freed block is current superblock that's full
+    *(uint64_t *)fs_space = block;//set new super block to be our freed block with addr of next block at end
     return 0;
 }

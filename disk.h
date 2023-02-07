@@ -47,12 +47,12 @@ typedef struct inode node;
 #define IFSOCK    0xC000  //Socket
 
 
-void tfs_mkfs(void *fs_space);
+int tfs_mkfs(void *fs_space);
 void *allocate_inode(void *fs_space);
 int free_inode(void *inode);
 int read_inode(void * inode, void * buff);
 int write_inode(void * inode, void * buff);
-uint32_t read_block(void* fs_space, void *buff, uint32_t block, off_t offset, uint32_t bytes);
-uint32_t write_block(void* fs_space, void *buff, uint32_t block, off_t offset, uint32_t bytes);
-uint32_t allocate_block(void* fs_space);
-uint32_t free_block(void* fs_space, uint32_t block);
+uint32_t read_block(void *buff, void* block, off_t offset, uint32_t bytes);
+uint32_t write_block(void *buff, void* block, off_t offset, uint32_t bytes);
+void * allocate_block(void* fs_space);
+int free_block(void* fs_space, void * block);
