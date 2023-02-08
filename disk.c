@@ -83,6 +83,8 @@ int tfs_mkfs(void *fs_space)
 /*
 @brief allocate an available inode
 @return memory location of inode. Returns NULL if no inode is available
+@note User must set mode once pointer is returned to properly take it off the free lost.
+Alternative is to make change here in the code.
 */
 void *allocate_inode(void *fs_space)
 {
