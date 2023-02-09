@@ -44,7 +44,7 @@ void test_tfs_mkfs()
         node *inode_ptr = memspace+i;
         assert (inode_ptr->mode == 0);
     }
-    printf("Past mkfs test");
+    printf("Past mkfs test\n");
 
 }
 
@@ -95,7 +95,7 @@ void test_allocate_and_free_inode()
     node *null_ptr = allocate_inode(memspace);
     assert(null_ptr == NULL);
 
-    printf("Passed allocate/free inode test.");
+    printf("Passed allocate/free inode test.\n");
 
     //Free some inodes for future tests
     free_inode(first_inode);
@@ -128,7 +128,7 @@ void test_read_and_write_inode()
     assert(new_node->mode == 2);
     assert(new_node->links == 2);
 
-    printf("Past read and write inode test.");
+    printf("Past read and write inode test.\n");
 }
 
 void test_allocate_block()
@@ -160,5 +160,5 @@ int main(int argc, char *argv[])
     test_allocate_and_free_inode();
     test_read_and_write_inode();
 
-    printf("All tests passed.");
+    printf("All tests passed.\n");
 }
