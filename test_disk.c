@@ -9,13 +9,11 @@
 uint8_t *memspace;
 
 int has_no_overlap(void *first_node, void *second_node){
-    node *node1 = first_node;
-    node *node2 = second_node;
-    if (node1==NULL || node2==NULL){
+    if (first_node==NULL || second_node==NULL){
         return 0;
     }
-    return (node1<=node2 && node1 + INODE_SIZE_BOUNDARY <= node2) || 
-    (node1>node2 && node2 + INODE_SIZE_BOUNDARY <= node1);
+    return (first_node<=second_node && first_node + INODE_SIZE_BOUNDARY <= second_node) || 
+    (first_node>second_node && second_node + INODE_SIZE_BOUNDARY <= first_node);
 }
 
 int stays_in_block(void *inode){
