@@ -2,13 +2,30 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "include/fuse.h"
 #include "tyrant.h"
 
 uint8_t *memspace;
 
-void tfs_mkdir()
+/*
+@brief make a directory path by allocating an inode and adding it to the directory list
+
+*/
+int tfs_mkdir(const char * path, mode_t m)
 {
+    node * dir_node = allocate_inode(memspace);
+    if(dir_node == NULL)
+        return -1;
+    //https://jameshfisher.com/2017/02/24/what-is-mode_t/
+    //what mode_t means
+    dir_node->mode = m;//definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
+    dir_node->mode |= S_IFDIR;
+
+
+
+    
+    return 0;
 }
 void tfs_getattr()
 {

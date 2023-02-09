@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "disk.h"
+#include<time.h>
 /*
 @brief mkfs for tyrant DEFAULT
 @param fs_space pointer to where beginning of memory space to write over
@@ -69,12 +70,25 @@ int tfs_mkfs(void *fs_space)
             if(addr_counter >= NUM_FREE_BLOCKS)
                 break;
             addr_counter++;
-            *(uint64_t*)(free_blockptr+i) = block_ptr;//write in address
+            // *(uint64_t*)(free_blockptr+i) = block_ptr;//write in address
+            memcpy(free_blockptr+i, &block_ptr, sizeof(block_ptr));
             block_ptr += BLOCKSIZE;
         }
         free_blockptr = block_ptr-BLOCKSIZE;//go back and write the last address stored
     }
+    node * root = allocate_inode(fs_space);
+    root->mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH;//User, group, and other can only read
+    root->access_time = (uint32_t) time(NULL);
+    root->creation_time = (uint32_t) time(NULL);
+    uint8_t * block = allocate_block(fs_space);
+    root->direct_blocks[0] = block;
+    char path1 []= ".";
+    char path2 [] = "..";
+    write_block(path1, block, 0, sizeof(path1));//56 bytes for directory name
+    write_block(&root, block, 56, sizeof(root));//write root address
 
+    write_block(path2, block, 64, sizeof(path2));
+    write_block(&root, block, 64*2-8, sizeof(root));//write root address
     return 0;
 }
 
@@ -233,7 +247,7 @@ void * allocate_block(void *fs_space)
     }
     //The block was completely zeroed out which means it was the only block available
     free_block = *(uint64_t *)fs_space; // set to block given by super block since zeroed out
-    next_block = (uint64_t *)fs_space;
+    next_block = fs_space;
     *(uint64_t *)fs_space = 0;
     return next_block; // we only get here if block is filled with zeros meaning it was the last free block
 }
@@ -255,7 +269,8 @@ int free_block(void *fs_space, void * block)
     uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
     if (next_block == fs_space)//Add as super block if there aren't any other free blocks
     {
-        *(uint64_t *)fs_space = block;
+        // *(uint64_t *)fs_space = block;
+        memcpy(fs_space, &block, sizeof(block));
         bzero(block, BLOCKSIZE); // clear block
         return 0;// success
     }
@@ -265,7 +280,8 @@ int free_block(void *fs_space, void * block)
         free_block = *(uint64_t *)next_block;
         if (free_block == 0) // a free spot to write in a new block
         {
-            *(uint64_t *)next_block = block; // write in block to free space
+            // *(uint64_t *)next_block = block; // write in block to free space
+            memcpy(next_block, &block, sizeof(block));
             if (i == BLOCKSIZE-8)//first address at end
             {
                 bzero(block, BLOCKSIZE); // zero if we are set up to jump here
@@ -276,7 +292,9 @@ int free_block(void *fs_space, void * block)
     }
     // if the whole block is full, make block next super block with link to the full one
     bzero(block, BLOCKSIZE);
-    *(uint64_t *)(block+BLOCKSIZE-8) = *(uint64_t *)fs_space; //last address in freed block is current superblock that's full
-    *(uint64_t *)fs_space = block;//set new super block to be our freed block with addr of next block at end
+    // *(uint64_t *)(block+BLOCKSIZE-8) = *(uint64_t *)fs_space; //last address in freed block is current superblock that's full
+    memcpy(block+BLOCKSIZE-8, fs_space, 8);
+    memcpy(fs_space, &block, sizeof(block));
+    // *(uint64_t *)fs_space = block;//set new super block to be our freed block with addr of next block at end
     return 0;
 }

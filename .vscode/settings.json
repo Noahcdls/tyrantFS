@@ -7,6 +7,10 @@
         "cmath": "c",
         "*.tcc": "c",
         "type_traits": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "stat.h": "c",
+        "tyrant.h": "c",
+        "limits": "c",
+        "select.h": "c"
     }
 }

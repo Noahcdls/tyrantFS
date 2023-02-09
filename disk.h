@@ -2,7 +2,9 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <string.h>
+#include <stdlib.h>
 #include <math.h>
+#include <sys/stat.h>
 #define BLOCKSIZE 4096
 #define MEMSIZE 1024*1024*1024 //1GB
 #define END_OF_INODE 3 //3 is first data block, 2 is last inode
@@ -17,24 +19,25 @@ struct inode{
     uint32_t mode;//permissions, file type (dir, file, special)
     uint32_t size_hi;
     uint32_t size_lo;//size i bytes
-    uint32_t access_time;
-    uint32_t change_time;
-    uint32_t data_time;//time of last access, changes to inode(ex. name), and last data modification time
-    uint32_t creation_time;
-    uint32_t deletion_time;
+    uint64_t access_time;
+    uint64_t change_time;
+    uint64_t data_time;//time of last access, changes to inode(ex. name), and last data modification time
+    uint64_t creation_time;
+    uint64_t deletion_time;
     uint32_t links;//linked count
     uint32_t blocks_hi;
     uint32_t blocks_lo;//num of blocks
-    uint32_t direct_blocks[12];
-    uint32_t indirect_blocks;
-    uint32_t  dbl_indirect;
-    uint32_t trpl_indirect;//holds block positions for blocks
+    uint8_t * direct_blocks[12];
+    uint8_t * indirect_blocks;
+    uint8_t * dbl_indirect;
+    uint8_t * trpl_indirect;//holds block positions for blocks
     uint32_t flags;
     uint32_t checksum;
 
 
 };
 typedef struct inode node;
+
  
 #define INODE_SIZE_BOUNDARY (uint32_t)pow(2, ceil(log(sizeof(node))/log(2)))
 
