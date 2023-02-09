@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
     memspace = malloc(MEMSIZE);
 
     test_tfs_mkfs();
-    test_allocate_inode();
+    test_allocate_and_free_inode();
 
     printf("All tests passed.");
 }
