@@ -44,7 +44,7 @@ void test_tfs_mkfs()
         node *inode_ptr = memspace+i;
         assert (inode_ptr->mode == 0);
     }
-    printf("Past mkfs test\n");
+    printf("Passed mkfs test\n");
 
 }
 
@@ -128,7 +128,7 @@ void test_read_and_write_inode()
     assert(new_node->mode == 2);
     assert(new_node->links == 2);
 
-    printf("Past read and write inode test.\n");
+    printf("Passed read and write inode test.\n");
 }
 
 void test_allocate_block()
