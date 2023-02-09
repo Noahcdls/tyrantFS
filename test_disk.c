@@ -14,8 +14,8 @@ int has_no_overlap(void *first_node, void *second_node){
     if (node1==NULL || node2==NULL){
         return 0;
     }
-    return (node1<=node2 && node1->checksum + sizeof(node1->checksum) <= node2) || 
-    (node1>node2 && node2->checksum + sizeof(node2->checksum) <= node1);
+    return (node1<=node2 && node1 + INODE_SIZE_BOUNDARY <= node2) || 
+    (node1>node2 && node2 + INODE_SIZE_BOUNDARY <= node1);
 }
 
 int stays_in_block(void *inode){
@@ -27,7 +27,7 @@ int stays_in_block(void *inode){
         uint8_t *start_block = memspace + i*BLOCKSIZE;
         uint8_t *next_block = memspace + (i+1)*BLOCKSIZE;
         if (node_ptr>start_block && node_ptr<next_block){
-            uint8_t *last_byte_of_node = (node_ptr->checksum + sizeof(node_ptr->checksum)-1);
+            uint8_t *last_byte_of_node = (node_ptr + INODE_SIZE_BOUNDARY-1);
             return last_byte_of_node>start_block && last_byte_of_node<next_block;
         }
     }
@@ -47,7 +47,7 @@ void test_tfs_mkfs()
         node *inode_ptr = memspace+i;
         assert (inode_ptr->mode == 0);
     }
-
+    printf("Past mkfs test");
 
 }
 
@@ -98,16 +98,40 @@ void test_allocate_and_free_inode()
     node *null_ptr = allocate_inode(memspace);
     assert(null_ptr == NULL);
 
+    printf("Passed allocate/free inode test.");
+
+    //Free some inodes for future tests
+    free_inode(first_inode);
+    free_inode(last_inode);
 }
 
-void test_read_inode()
+void test_read_and_write_inode()
 {
+    //alocate an inode and set some attributes
+    node *inode_ptr = allocate_inode(memspace);
+    inode_ptr->mode = 1;
+    inode_ptr->links = 1;
 
-}
+    //create a buffer, read the inode, and check the attributes
+    uint8_t *buffer = malloc(INODE_SIZE_BOUNDARY);
+    int status = read_inode(inode_ptr, buffer);
+    assert(status == 0);
+    node *new_node = buffer;
+    assert(new_node->mode == 1);
+    assert(new_node->links == 1);
 
-void test_write_inode()
-{
+    new_node->mode = 2;
+    new_node->links = 2;
 
+    int write_status = write_inode(inode_ptr, buffer);
+    assert(write_status == 0);
+
+    status = read_inode(inode_ptr, buffer);
+    new_node = buffer;
+    assert(new_node->mode == 2);
+    assert(new_node->links == 2);
+
+    printf("Past read and write inode test.");
 }
 
 void test_allocate_block()
@@ -137,6 +161,7 @@ int main(int argc, char *argv[])
 
     test_tfs_mkfs();
     test_allocate_and_free_inode();
+    test_read_and_write_inode();
 
     printf("All tests passed.");
 }
