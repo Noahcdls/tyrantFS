@@ -36,7 +36,7 @@ struct inode{
 };
 typedef struct inode node;
  
-#define INODE_SIZE_BOUNDARY (uint32_t)ceil(log(sizeof(node))/log(2))
+#define INODE_SIZE_BOUNDARY (uint32_t)pow(2, ceil(log(sizeof(node))/log(2)))
 
 #define IFIFO     0x1000  //FIFO
 #define IFCHR     0x2000  //Character Device
