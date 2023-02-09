@@ -19,15 +19,14 @@ int has_no_overlap(void *first_node, void *second_node){
 }
 
 int stays_in_block(void *inode){
-    node *node_ptr = inode;
     if (inode==NULL){
         return 0;
     }
     for (int i = 1; i< END_OF_INODE;i+=1){
         uint8_t *start_block = memspace + i*BLOCKSIZE;
         uint8_t *next_block = memspace + (i+1)*BLOCKSIZE;
-        if (node_ptr>start_block && node_ptr<next_block){
-            uint8_t *last_byte_of_node = (node_ptr + INODE_SIZE_BOUNDARY-1);
+        if (inode>=start_block && inode<next_block){
+            uint8_t *last_byte_of_node = (inode + INODE_SIZE_BOUNDARY-1);
             return last_byte_of_node>start_block && last_byte_of_node<next_block;
         }
     }
@@ -40,7 +39,7 @@ void test_tfs_mkfs()
     assert(result == -1);
 
     int result2 = tfs_mkfs(memspace);
-    assert(result == 0);
+    assert(result2 == 0);
 
     //check that all inodes are free
     for (int i = BLOCKSIZE; i< END_OF_INODE*BLOCKSIZE; i+=INODE_SIZE_BOUNDARY){
