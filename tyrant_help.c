@@ -1,51 +1,102 @@
 #include "disk.h"
 #include "tyrant_help.h"
 
-
-int add_block_to_node(void * fs_space, node * parent){
-    if(parent == NULL)
+int add_block_to_node(void *fs_space, node *parent)
+{
+    if (parent == NULL)
         return -1;
-    uint8_t * block = allocate_block(fs_space);
-    if(block == NULL)
+    uint8_t *block = allocate_block(fs_space);
+    if (block == NULL)
         return;
-    if(parent->blocks == UINT64_MAX){
+    if (parent->blocks == UINT64_MAX)
+    {
         free_block(fs_space, block);
         return -1;
     }
-    parent->blocks += 1;
-    if(parent->blocks <= 12){
-        parent->direct_blocks[parent->blocks-1] = block;
+    if (parent->blocks < 12)
+    {
+        parent->direct_blocks[parent->blocks - 1] = block;
+        parent->blocks += 1;
         return 0;
     }
-    else if(parent->blocks <= 12 + BLOCKSIZE/ADDR_LENGTH){
-        uint32_t bytes = write_block(&block, parent->indirect_blocks, parent->blocks - 12 - ADDR_LENGTH, ADDR_LENGTH);
-        if(bytes == 0)
+    else if (parent->blocks < 12 + BLOCKSIZE / ADDR_LENGTH)
+    {
+        if (parent->indirect_blocks == NULL)
+        { // add block where necessary
+            parent->indirect_blocks = allocate_block(fs_space);
+            if (parent->indirect_blocks == NULL)
+            {
+                free_block(fs_space, block);
+                return -1;
+            }
+        }
+        uint32_t bytes = write_block(&block, parent->indirect_blocks, (parent->blocks - 12) * ADDR_LENGTH - ADDR_LENGTH, ADDR_LENGTH);
+        if (bytes == 0)
+        {
+            free_block(fs_space, block);
             return -1;
+        }
+        parent->blocks += 1;
         return 0;
+    }
+    else if (parent->blocks < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2))
+    {
+        if (parent->dbl_indirect == NULL)
+        {
+            parent->dbl_indirect = allocate_block(fs_space);
+            if (parent->dbl_indirect == NULL)
+            {
+                free_block(fs_space, block);
+                return -1;
+            }
+        }
+        node * indir_node = NULL;
+        uint64_t base = 12 + BLOCKSIZE / ADDR_LENGTH;
+        for(int i = BLOCKSIZE/ADDR_LENGTH; i <= pow(BLOCKSIZE/ADDR_LENGTH, 2); i += BLOCKSIZE/ADDR_LENGTH){//find which indir block this belongs to
+            if(parent->blocks < base + i){
+                read_block(&indir_node, parent->dbl_indirect, ((i/(BLOCKSIZE/ADDR_LENGTH))-1)*ADDR_LENGTH, ADDR_LENGTH);//read indirect block address
+                if(indir_node == 0){//this indirect block does not exist
+                    indir_node = allocate_block(fs_space);
+                    if(indir_node == NULL){
+                        free_block(fs_space, indir_node);
+                        free_block(fs_space, block);
+                        return -1;
+                    }
+                    write_block(&indir_node, parent->dbl_indirect, (parent->blocks -(base+i-BLOCKSIZE/ADDR_LENGTH))*ADDR_LENGTH, ADDR_LENGTH);//write indirect block address in dbl block
+                }
+                int x = parent->blocks -(base+i-BLOCKSIZE/ADDR_LENGTH);//STUB
+                write_block(&block, indir_node, x*ADDR_LENGTH, ADDR_LENGTH);//write block address in indirect block
+                return 0;
+            }
+
+        }
+        return -1;
+    }
+    else
+    {
+        return 0; // STUB
     }
 
     return 0;
-
-
 }
 
-
-int add_addr(uint8_t * block, node * addr, char * name){
-    if(block == NULL)
+int add_addr(uint8_t *block, node *addr, char *name)
+{
+    if (block == NULL)
         return;
-    char temp [NAME_BOUNDARY-ADDR_LENGTH];
+    char temp[NAME_BOUNDARY - ADDR_LENGTH];
     strcpy(temp, name);
-    for(int i = 0; i < BLOCKSIZE; i+=NAME_BOUNDARY){
-        if(*(block+i) == 0){//no name so can write over
-            write_block(temp, block, i, NAME_BOUNDARY-ADDR_LENGTH);//write name
-            write_block(&addr, block, NAME_BOUNDARY-ADDR_LENGTH, ADDR_LENGTH);//write address
+    for (int i = 0; i < BLOCKSIZE; i += NAME_BOUNDARY)
+    {
+        if (*(block + i) == 0)
+        {                                                                        // no name so can write over
+            write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH);            // write name
+            write_block(&addr, block, NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
             return 0;
         }
     }
     return -1;
-
 }
-
 
 /*
 @brief add a child inode to a parent directory
@@ -53,23 +104,20 @@ int add_addr(uint8_t * block, node * addr, char * name){
 @param child child inode
 @return 0 for success, -1 failure
 */
-int add_child(void * fs_space, node *parent, node *child, char * name)
+int add_child(void *fs_space, node *parent, node *child, char *name)
 {
     uint64_t num_blocks = parent->blocks;
-    if(num_blocks == 0)//an inode should at least have 1 block allocated
+    if (num_blocks == 0) // an inode should at least have 1 block allocated
         return -1;
     if (num_blocks <= 12)
     {
-        int result = add_addr(parent->direct_blocks[parent->blocks-1], child, name);
+        int result = add_addr(parent->direct_blocks[parent->blocks - 1], child, name);
         add_block_to_node(fs_space, parent);
     }
-    if(num_blocks <= 12+BLOCKSIZE/ADDR_LENGTH)
+    if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH)
     {
         return 0;
     }
-
-
-
 }
 
 /*
@@ -149,7 +197,6 @@ void *check_dbl_indirect_blk(uint8_t *block, char *name, int64_t *block_count)
     return NULL;
 }
 
-
 /*
 @brief check triple indirect block for address
 @param triple indirect block
@@ -174,7 +221,6 @@ void *check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
     }
     return NULL;
 }
-
 
 /*
 @brief Given a path, attempt to find the corresponding inode
