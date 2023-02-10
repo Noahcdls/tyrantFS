@@ -233,20 +233,20 @@ void * allocate_block(void *fs_space)
     uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
     if (next_block == fs_space)
         return NULL; // no more free blocks since next block is super block
-    for (uint64_t i = 0; i < BLOCKSIZE; i += 8)//8 byte addresses for large storage drives (32bit )
+    for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)//8 byte addresses for large storage drives (32bit )
     {
         free_block = *(uint64_t *)next_block;
         if (free_block != 0)
         {
             bzero(next_block, sizeof(uint64_t)); // zero out available block
-            if (i == BLOCKSIZE - 8)//only 1 available address. Update super block
+            if (i == BLOCKSIZE - ADDR_LENGTH)//only 1 available address. Update super block
             {
                 free_block = *(uint64_t *)fs_space;                // set free block as current block we are looking in
                 *(uint64_t *)fs_space = *(uint64_t *)(next_block); // last 8 bytes contain what to set next super block value
             }
             return next_block;
         }
-        next_block = next_block + 8; // advance 8 bytes
+        next_block = next_block + ADDR_LENGTH; // advance 8 bytes
     }
     //The block was completely zeroed out which means it was the only block available
     free_block = *(uint64_t *)fs_space; // set to block given by super block since zeroed out
@@ -278,25 +278,25 @@ int free_block(void *fs_space, void * block)
         return 0;// success
     }
     // next_block += BLOCKSIZE-8;//get to last stored address.
-    for (uint64_t i = 0; i < BLOCKSIZE; i += 8)
+    for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
     {
         free_block = *(uint64_t *)next_block;
         if (free_block == 0) // a free spot to write in a new block
         {
             // *(uint64_t *)next_block = block; // write in block to free space
             memcpy(next_block, &block, sizeof(block));
-            if (i == BLOCKSIZE-8)//first address at end
+            if (i == BLOCKSIZE-ADDR_LENGTH)//first address at end
             {
                 bzero(block, BLOCKSIZE); // zero if we are set up to jump here
             }
             return 0;
         }
-        next_block = next_block + 8; // advance 8 bytes
+        next_block = next_block + ADDR_LENGTH; // advance 8 bytes
     }
     // if the whole block is full, make block next super block with link to the full one
     bzero(block, BLOCKSIZE);
     // *(uint64_t *)(block+BLOCKSIZE-8) = *(uint64_t *)fs_space; //last address in freed block is current superblock that's full
-    memcpy(block+BLOCKSIZE-8, fs_space, 8);
+    memcpy(block+BLOCKSIZE-8, fs_space, ADDR_LENGTH);
     memcpy(fs_space, &block, sizeof(block));
     // *(uint64_t *)fs_space = block;//set new super block to be our freed block with addr of next block at end
     return 0;

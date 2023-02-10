@@ -9,6 +9,7 @@
 #define MEMSIZE 1024*1024*1024 //1GB
 #define END_OF_INODE 3 //3 is first data block, 2 is last inode
 #define NUM_FREE_BLOCKS 64
+#define ADDR_LENGTH sizeof(uint8_t*)
 
 
 //ext4 stuff but worth copying some over

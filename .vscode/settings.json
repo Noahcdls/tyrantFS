@@ -11,6 +11,9 @@
         "stat.h": "c",
         "tyrant.h": "c",
         "limits": "c",
-        "select.h": "c"
+        "select.h": "c",
+        "tyrant_help.h": "c",
+        "disk.h": "c",
+        "unistd.h": "c"
     }
 }
