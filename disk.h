@@ -17,23 +17,21 @@ struct inode{
     uint32_t user_id;
     uint32_t group_id;
     uint32_t mode;//permissions, file type (dir, file, special)
-    uint32_t size_hi;
-    uint32_t size_lo;//size i bytes
+    uint64_t size;//size i bytes
     uint64_t access_time;
     uint64_t change_time;
     uint64_t data_time;//time of last access, changes to inode(ex. name), and last data modification time
     uint64_t creation_time;
     uint64_t deletion_time;
     uint32_t links;//linked count
-    uint32_t blocks_hi;
-    uint32_t blocks_lo;//num of blocks
+    uint64_t blocks;//number of blocks used
     uint8_t * direct_blocks[12];
     uint8_t * indirect_blocks;
     uint8_t * dbl_indirect;
     uint8_t * trpl_indirect;//holds block positions for blocks
     uint32_t flags;
     uint32_t checksum;
-
+    
 
 };
 typedef struct inode node;
@@ -48,6 +46,10 @@ typedef struct inode node;
 #define IFREG     0x8000  //regular file
 #define IFLNK     0xA000  //Symbolic link
 #define IFSOCK    0xC000  //Socket
+
+
+node * root;
+#define NAME_BOUNDARY 64
 
 
 int tfs_mkfs(void *fs_space);

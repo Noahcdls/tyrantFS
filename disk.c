@@ -76,7 +76,7 @@ int tfs_mkfs(void *fs_space)
         }
         free_blockptr = block_ptr-BLOCKSIZE;//go back and write the last address stored
     }
-    node * root = allocate_inode(fs_space);
+    root = allocate_inode(fs_space);
     root->mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH;//User, group, and other can only read
     root->access_time = (uint32_t) time(NULL);
     root->creation_time = (uint32_t) time(NULL);
@@ -89,6 +89,9 @@ int tfs_mkfs(void *fs_space)
 
     write_block(path2, block, 64, sizeof(path2));
     write_block(&root, block, 64*2-8, sizeof(root));//write root address
+    root->data_time = time(NULL);
+    root->size = NAME_BOUNDARY*2;
+    root->blocks = 1;
     return 0;
 }
 
