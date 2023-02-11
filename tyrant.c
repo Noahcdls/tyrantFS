@@ -71,7 +71,7 @@ int tfs_mkdir(const char *path, mode_t m)
     write_block("..", block, PATH_BOUNDARY, sizeof(".."));
     write_block(&parent_node, block, 2 * PATH_BOUNDARY - sizeof(uint8_t *), sizeof(parent_node)); // write address of parent node
 
-    int result = add_child(memspace, parent_node, dir_node, (temp+i+1));
+    int result = add_to_directory(memspace, parent_node, dir_node, (temp+i+1));
     if (!result)
     {
         free_block(memspace, block); // need memspace since we need to write on disk/working memory too

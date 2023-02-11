@@ -174,7 +174,7 @@ int write_inode(void * inode, void * buff){
 */
 uint32_t read_block(void *buff, void * block, off_t offset, uint32_t bytes)
 {
-    if(buff == NULL || block == NULL)
+    if(buff == NULL || block == NULL || block == 0)
         return 0;
     if(offset > BLOCKSIZE || offset < 0)
         return 0;
