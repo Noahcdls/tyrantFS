@@ -58,7 +58,7 @@ int tfs_mkfs(void *fs_space)
         bzero(inode_init, INODE_SIZE_BOUNDARY); // clear out inode info
     }
 
-    *((uint32_t *)fs_space) = END_OF_INODE;                       // superblock holds first free block address
+    *(uint64_t*)fs_space = fs_space+END_OF_INODE*BLOCKSIZE;                       // superblock holds first free block address
     uint8_t *free_blockptr = fs_space + END_OF_INODE * BLOCKSIZE; // shift pointer over to his free block
     uint64_t block_counter = END_OF_INODE;
 
@@ -232,7 +232,8 @@ uint32_t write_block(void *buff, void *block, off_t offset, uint32_t bytes)
 void *allocate_block(void *fs_space)
 {
     uint8_t *free_block = 0;
-    uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
+    // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
+    uint8_t * next_block = (*(uint64_t *)fs_space);
     if (next_block == fs_space)
         return NULL;                                      // no more free blocks since next block is super block
     for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH) // 8 byte addresses for large storage drives (32bit )
@@ -270,7 +271,8 @@ int free_block(void *fs_space, void *block)
     if (fs_space == NULL || block == NULL)
         return -1;
     uint64_t free_block = 0;
-    uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
+    // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
+    uint8_t * next_block = (*(uint64_t *)fs_space);//ptrs are 8 bytes so get uint64_t value then convert as uint8 ptr
     if (next_block == fs_space)                                         // Add as super block if there aren't any other free blocks
     {
         // *(uint64_t *)fs_space = block;
@@ -297,7 +299,7 @@ int free_block(void *fs_space, void *block)
     // if the whole block is full, make block next super block with link to the full one
     bzero(block, BLOCKSIZE);
     // *(uint64_t *)(block+BLOCKSIZE-8) = *(uint64_t *)fs_space; //last address in freed block is current superblock that's full
-    memcpy(block + BLOCKSIZE - 8, fs_space, ADDR_LENGTH);
+    memcpy(block + BLOCKSIZE - ADDR_LENGTH, fs_space, ADDR_LENGTH);
     memcpy(fs_space, &block, sizeof(block));
     // *(uint64_t *)fs_space = block;//set new super block to be our freed block with addr of next block at end
     return 0;
