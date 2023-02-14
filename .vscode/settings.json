@@ -14,6 +14,7 @@
         "select.h": "c",
         "tyrant_help.h": "c",
         "disk.h": "c",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "time_t.h": "c"
     }
 }

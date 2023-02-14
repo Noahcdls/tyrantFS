@@ -178,6 +178,7 @@ int add_to_directory(void *fs_space, node *parent, node *child, char *name)
                 return -1;
             result = add_addr(blk_result, child, name);
         }
+        parent->size += result < 0 ? 0 : NAME_BOUNDARY;
         return result;
     }
     else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH)//indirect
@@ -195,6 +196,7 @@ int add_to_directory(void *fs_space, node *parent, node *child, char *name)
                 return -1;
             result = add_addr(blk_result, child, name);
         }
+        parent->size += result < 0 ? 0 : NAME_BOUNDARY;
         return result;
     }
     else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2))//double indirect
@@ -215,6 +217,7 @@ int add_to_directory(void *fs_space, node *parent, node *child, char *name)
                     blk_result = add_block_to_node(fs_space, parent);
                     result = add_addr(blk_result, child, name);
                 }
+                parent->size += result < 0 ? 0 : NAME_BOUNDARY;
                 return result;
             }
         }
@@ -236,6 +239,7 @@ int add_to_directory(void *fs_space, node *parent, node *child, char *name)
                             blk_result = add_block_to_node(fs_space, parent);
                             result = add_addr(blk_result, child, name);
                         }
+                        parent->size += result < 0 ? 0 : NAME_BOUNDARY;
                         return result;
                     }
                 }
