@@ -234,7 +234,7 @@ void *allocate_block(void *fs_space)
     uint8_t *free_block = 0;
     // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
     uint8_t * next_block = (*(uint64_t *)fs_space);
-    if (next_block == fs_space)
+    if (next_block == NULL)
         return NULL;                                      // no more free blocks since next block is super block
     for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH) // 8 byte addresses for large storage drives (32bit )
     {
@@ -244,8 +244,9 @@ void *allocate_block(void *fs_space)
             bzero(next_block, sizeof(uint8_t *)); // zero out available block
             if (i == BLOCKSIZE - ADDR_LENGTH)     // only 1 available address. Update super block
             {
+                memcpy(next_block, &free_block, ADDR_LENGTH); // Save address of next free list block
                 memcpy(&free_block, fs_space, ADDR_LENGTH); // set free block as current block we are looking in
-                memcpy(fs_space, next_block, ADDR_LENGTH); // last 8 bytes contain what to set next super block value
+                memcpy(fs_space, next_block, ADDR_LENGTH); // Change super block to point to next free list block
             }
             return free_block;
         }
@@ -273,10 +274,10 @@ int free_block(void *fs_space, void *block)
     uint64_t free_block = 0;
     // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
     uint8_t * next_block = (*(uint64_t *)fs_space);//ptrs are 8 bytes so get uint64_t value then convert as uint8 ptr
-    if (next_block == fs_space)                                         // Add as super block if there aren't any other free blocks
+    if (next_block == NULL)                                         // Add as super block if there aren't any other free blocks
     {
         // *(uint64_t *)fs_space = block;
-        memcpy(fs_space, &block, sizeof(block));
+        memcpy(fs_space, &block, ADDR_LENGTH);
         bzero(block, BLOCKSIZE); // clear block
         return 0;                // success
     }
@@ -287,7 +288,7 @@ int free_block(void *fs_space, void *block)
         if (free_block == 0) // a free spot to write in a new block
         {
             // *(uint64_t *)next_block = block; // write in block to free space
-            memcpy(next_block, &block, sizeof(block));
+            memcpy(next_block, &block, ADDR_LENGTH);
             if (i == BLOCKSIZE - ADDR_LENGTH) // first address at end
             {
                 bzero(block, BLOCKSIZE); // zero if we are set up to jump here
