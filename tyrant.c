@@ -334,6 +334,68 @@ int tfs_open(const char *path, struct fuse_file_info *fi){
     return -1;
 }
 
+/// @brief Removes a file or a directory
+/// @param pathname file path
+/// @return 0 success, -1 failure
+int tfs_unlink(const char *pathname){
+    // first check if the pathname is valid
+    node *cur_node = find_path_node(pathname);
+    if (cur_node == NULL){
+        return -1;
+    }
+
+    // cannot remove root
+    if(!strcmp(pathname, "/")) {    //if root, return -1 (operation not permitted)
+        return -1;
+    }
+
+
+
+}
+
+/// @brief Removes a file or a directory
+/// @param path file path
+/// @param buf buffer
+/// @param size number of bytes to read
+/// @param offset offset into file
+/// @return On success, the number of bytes read is returned (zero indicates end of file), and the file position is advanced by this number. On error, -1 is returned.
+int tfs_read(const char *path, char *buf, size_t size, off_t offset,struct fuse_file_info *fi){
+    node *file = find_path_node(path);
+    if (file == NULL){
+        return -1;
+    }
+    
+    size_t len;
+    len = file->size;
+
+    if (offset < len){
+        if (offset + size > len){
+            //clamp the size so that we don't read beyond boundary
+            size = len - offset;
+            //TODO: read data
+        }
+    }
+    else {
+        size = 0;
+        strcpy(buf, "");
+    }
+
+    return size;
+
+}
+
+/// @brief writes up to count bytes from the buffer starting at buf to the file referred to by the file descriptor fd.
+/// @param path file path
+/// @param buf buffer
+/// @param size number of bytes to write
+/// @param offset offset into file
+/// @return On success, the number of bytes written is returned.  On error, -1 is returned
+int tfs_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi){
+    node *file = find_path_node(path);
+    if (file == NULL){
+        return -1;
+    }
+}
 
 
 static struct fuse_operations operations = {
