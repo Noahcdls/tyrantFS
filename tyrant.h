@@ -13,8 +13,8 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
                 struct fuse_file_info *fi, enum fuse_readdir_flags fuse_flag);
 int tfs_open(const char *path, struct fuse_file_info *fi);
 int tfs_flush(const char *path, struct fuse_file_info *fi);
-int tfs_read(const char *path, char *, size_t size, off_t offset,
+int tfs_read(const char *path, char * buff, size_t size, off_t offset,
              struct fuse_file_info *fi);
-int tfs_write(const char *path, const char *, size_t size, off_t offset,
+int tfs_write(const char *path, const char * buff, size_t size, off_t offset,
               struct fuse_file_info *fi);
 int tfs_unlink(const char *path);

@@ -58,7 +58,7 @@ int tfs_mkfs(void *fs_space)
         bzero(inode_init, INODE_SIZE_BOUNDARY); // clear out inode info
     }
 
-    *(uint64_t*)fs_space = fs_space+END_OF_INODE*BLOCKSIZE;                       // superblock holds first free block address
+    *(uint64_t *)fs_space = fs_space + END_OF_INODE * BLOCKSIZE;  // superblock holds first free block address
     uint8_t *free_blockptr = fs_space + END_OF_INODE * BLOCKSIZE; // shift pointer over to his free block
     uint64_t block_counter = END_OF_INODE;
 
@@ -174,14 +174,14 @@ int write_inode(void *inode, void *buff)
 @param bytes bytes you want to read
 @return valid number of bytes read
 */
-uint32_t read_block(void *buff, void *block, off_t offset, uint32_t bytes)
+uint32_t read_block(void *buff, void *block, off_t offset, uint64_t bytes)
 {
     if (buff == NULL || block == NULL || block == 0)
         return 0;
     if (offset > BLOCKSIZE || offset < 0)
         return 0;
     uint8_t *start = block + offset;
-    uint32_t bytes_avail = BLOCKSIZE - offset;
+    uint64_t bytes_avail = BLOCKSIZE - offset;
     if (bytes_avail < bytes)
     { // asking for more bytes than what is left so read what we can
         memcpy(buff, start, bytes_avail);
@@ -203,14 +203,14 @@ uint32_t read_block(void *buff, void *block, off_t offset, uint32_t bytes)
 @param bytes bytes you want to write
 @return valid number of bytes written
 */
-uint32_t write_block(void *buff, void *block, off_t offset, uint32_t bytes)
+uint32_t write_block(void *buff, void *block, off_t offset, uint64_t bytes)
 {
     if (buff == NULL || block == NULL)
         return 0;
     if (offset > BLOCKSIZE || offset < 0)
         return 0;
     uint8_t *start = block + offset;
-    uint32_t bytes_avail = BLOCKSIZE - offset;
+    uint64_t bytes_avail = BLOCKSIZE - offset;
     if (bytes_avail < bytes)
     { // want to write more bytes than what is left in block
         memcpy(start, buff, bytes_avail);
@@ -233,8 +233,8 @@ void *allocate_block(void *fs_space)
 {
     uint8_t *free_block = 0;
     // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
-    uint8_t * next_block = (*(uint64_t *)fs_space);
-    if (next_block == fs_space)
+    uint8_t *next_block = (*(uint64_t *)fs_space);
+    if (next_block == NULL)
         return NULL;                                      // no more free blocks since next block is super block
     for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH) // 8 byte addresses for large storage drives (32bit )
     {
@@ -244,17 +244,18 @@ void *allocate_block(void *fs_space)
             bzero(next_block, sizeof(uint8_t *)); // zero out available block
             if (i == BLOCKSIZE - ADDR_LENGTH)     // only 1 available address. Update super block
             {
-                memcpy(&free_block, fs_space, ADDR_LENGTH); // set free block as current block we are looking in
-                memcpy(fs_space, next_block, ADDR_LENGTH); // last 8 bytes contain what to set next super block value
+                memcpy(next_block, &free_block, ADDR_LENGTH); // Save address of next free list block
+                memcpy(&free_block, fs_space, ADDR_LENGTH);   // set free block as current block we are looking in
+                memcpy(fs_space, next_block, ADDR_LENGTH);    // Change super block to point to next free list block
             }
             return free_block;
         }
         next_block = next_block + ADDR_LENGTH; // advance 8 bytes
     }
     // The block was completely zeroed out which means it was the only block available
-    memcpy(&free_block, fs_space, ADDR_LENGTH); //write in address
-    bzero(fs_space, ADDR_LENGTH);//set super block to be 0
-    return free_block; // we only get here if block is filled with zeros meaning it was the last free block
+    memcpy(&free_block, fs_space, ADDR_LENGTH); // write in address
+    bzero(fs_space, ADDR_LENGTH);               // set super block to be 0
+    return free_block;                          // we only get here if block is filled with zeros meaning it was the last free block
 }
 
 /*
@@ -272,8 +273,8 @@ int free_block(void *fs_space, void *block)
         return -1;
     uint64_t free_block = 0;
     // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
-    uint8_t * next_block = (*(uint64_t *)fs_space);//ptrs are 8 bytes so get uint64_t value then convert as uint8 ptr
-    if (next_block == fs_space)                                         // Add as super block if there aren't any other free blocks
+    uint8_t *next_block = (*(uint64_t *)fs_space); // ptrs are 8 bytes so get uint64_t value then convert as uint8 ptr
+    if (next_block == NULL)                        // Add as super block if there aren't any other free blocks
     {
         // *(uint64_t *)fs_space = block;
         memcpy(fs_space, &block, sizeof(block));
@@ -303,4 +304,81 @@ int free_block(void *fs_space, void *block)
     memcpy(fs_space, &block, sizeof(block));
     // *(uint64_t *)fs_space = block;//set new super block to be our freed block with addr of next block at end
     return 0;
+}
+
+
+/// @brief fetch a specified block belonging to an inode
+/// @param my_node inode of interest
+/// @param block_no the block number ranging from 0 to my_node->blocks - 1 
+/// @return return block pointer or NULL
+void *fetch_block(void * my_node, uint64_t block_no)
+{
+    if (my_node == NULL)
+        return NULL;
+    node *parent = my_node;
+    uint8_t *block = NULL;
+    if (parent->blocks <= block_no)
+    { // only accept block_no from 0 to blocks-1
+        return NULL;
+    }
+
+    if (block_no < 12)
+    {
+        return parent->direct_blocks[block_no];
+    }
+    else if (block_no < 12 + BLOCKSIZE / ADDR_LENGTH)
+    {
+        read_block(&block, parent->indirect_blocks, (block_no - 12) * ADDR_LENGTH, ADDR_LENGTH);
+        return block;
+    }
+    else if (block_no < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2))
+    {
+        uint8_t *indir_blk = NULL;
+        uint64_t dbl_offset = block_no - 12 - BLOCKSIZE / ADDR_LENGTH;
+        for (uint64_t i = 0; i < pow(BLOCKSIZE / ADDR_LENGTH, 2); i += BLOCKSIZE / ADDR_LENGTH)
+        {
+            if (dbl_offset < i)
+            {
+                read_block(&indir_blk, parent->dbl_indirect, (i / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
+                if (indir_blk == 0)
+                {
+                    return NULL;
+                }
+                dbl_offset = dbl_offset - (i - BLOCKSIZE / ADDR_LENGTH);
+                read_block(&block, indir_blk, dbl_offset * ADDR_LENGTH, ADDR_LENGTH);
+                return block;
+            }
+        }
+    }
+    else if (block_no < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2) + pow(BLOCKSIZE / ADDR_LENGTH, 3))
+    {
+        uint8_t *dbl_blk = NULL;
+        uint8_t *indir_blk = NULL;
+        uint64_t trpl_offset = block_no - (12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2));
+        for (uint64_t i = 0; i < pow(BLOCKSIZE / ADDR_LENGTH, 3), i += pow(BLOCKSIZE / ADDR_LENGTH, 2))
+        {
+            if (trpl_offset < i)
+            {
+                read_block(&dbl_blk, parent->trpl_indirect, ((i / (pow(BLOCKSIZE / ADDR_LENGTH, 2))) - 1) * ADDR_LENGTH, ADDR_LENGTH);
+                if (dbl_blk == 0)
+                {
+                    return NULL;
+                }
+                trpl_offset = trpl_offset - (i - pow(BLOCKSIZE / ADDR_LENGTH, 2));
+                for (int j = 0; j < pow(BLOCKSIZE / ADDR_LENGTH, 2); j += BLOCKSIZE / ADDR_LENGTH)
+                {
+                    if (trpl_offset < j)
+                    {
+                        read_block(&indir_blk, dbl_blk, (j / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
+                        if (indir_blk == NULL)
+                            return NULL;
+                        trpl_offset = trpl_offset - (j - BLOCKSIZE / ADDR_LENGTH);
+                        read_block(&block, indir_blk, trpl_offset * ADDR_LENGTH, ADDR_LENGTH);
+                        return block;
+                    }
+                }
+            }
+        }
+    }
+    return NULL;
 }
