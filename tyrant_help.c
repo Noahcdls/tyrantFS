@@ -134,6 +134,84 @@ void *add_block_to_node(void *fs_space, node *parent)
     return NULL;
 }
 
+/// @brief Get the ith block of an inode
+/// @param cur_node node for the operation
+/// @param i index for the block in search
+/// @return pointer to ith block success, NULL failure
+void *get_i_block(node *cur_node, uint64_t i){
+    //curnode cannot be NULL
+    if (cur_node == NULL){
+        return NULL;
+    }
+
+    //cur_node should have at least one block
+    if (cur_node->blocks == 0){
+        return NULL;
+    }
+
+    // the index cannot be larger than the number of blocks the cur_node has.
+    if (cur_node->blocks<=i){
+        return NULL;
+    }
+
+    // cannot have negative index
+    if (i < 0) {
+        return NULL;
+    }
+
+    uint8_t *cur_blk;
+    if (i < 12)//direct
+    {
+        cur_blk = cur_node->direct_blocks[i];
+        return cur_blk;
+    }
+    else if (i < 12 + BLOCKSIZE / ADDR_LENGTH)//indirect
+    {
+        uint8_t *indir_blk = cur_node->indirect_blocks;
+
+        uint64_t indir_blk_offset = (i - 12)*ADDR_LENGTH;
+        if (indir_blk == NULL){
+            return NULL;
+        }
+        memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
+        return cur_blk;
+    }
+    else if (i < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2))//double indirect
+    {
+        uint8_t *indir_blk = NULL;
+        uint8_t *dbl_blk = cur_node->dbl_indirect;
+
+        uint64_t dbl_blk_offset = (i - 12 - BLOCKSIZE/ADDR_LENGTH)/(BLOCKSIZE/ADDR_LENGTH)*ADDR_LENGTH;
+        uint64_t indir_blk_offset = (i - 12 - BLOCKSIZE/ADDR_LENGTH)%(BLOCKSIZE/ADDR_LENGTH)*ADDR_LENGTH;
+
+        if (dbl_blk == NULL){
+            return NULL;
+        }
+        memcpy(&indir_blk, dbl_blk + dbl_blk_offset, ADDR_LENGTH);
+        memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
+        return cur_blk;
+        
+    }
+    else//triple indirect
+    {
+        uint8_t *indir_blk = NULL;
+        uint8_t *dbl_blk = NULL;
+        uint8_t *trpl_blk = cur_node->trpl_indirect;
+
+        uint64_t trpl_blk_offset = (i - 12 - BLOCKSIZE/ADDR_LENGTH - (BLOCKSIZE/ADDR_LENGTH)*(BLOCKSIZE/ADDR_LENGTH))/((BLOCKSIZE/ADDR_LENGTH)*(BLOCKSIZE/ADDR_LENGTH))*ADDR_LENGTH;
+        uint64_t dbl_blk_offset = (i - 12 - BLOCKSIZE/ADDR_LENGTH - (BLOCKSIZE/ADDR_LENGTH)*(BLOCKSIZE/ADDR_LENGTH))%((BLOCKSIZE/ADDR_LENGTH)*(BLOCKSIZE/ADDR_LENGTH))/(BLOCKSIZE/ADDR_LENGTH)*ADDR_LENGTH;
+        uint64_t indir_blk_offset = (i - 12 - BLOCKSIZE/ADDR_LENGTH - (BLOCKSIZE/ADDR_LENGTH)*(BLOCKSIZE/ADDR_LENGTH))%((BLOCKSIZE/ADDR_LENGTH)*(BLOCKSIZE/ADDR_LENGTH))%(BLOCKSIZE/ADDR_LENGTH)*ADDR_LENGTH;
+        if (trpl_blk == NULL){
+            return NULL;
+        }
+        memcpy(&dbl_blk, dbl_blk + trpl_blk_offset, ADDR_LENGTH);
+        memcpy(&indir_blk, dbl_blk + dbl_blk_offset, ADDR_LENGTH);
+        memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
+        return cur_blk;
+    }
+
+}
+
 /// @brief Adds address to directory block
 /// @param block block of where to store address
 /// @param addr ptr to inode we are adding into the directory
