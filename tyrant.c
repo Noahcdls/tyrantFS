@@ -146,189 +146,55 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
     node *dir = find_path_node(path);
     if (dir == NULL)
         return -1;
-
+    uint8_t *block = NULL;
     uint64_t block_count = 0;
     uint64_t byte_count = 0;
     uint64_t total_blocks = dir->blocks;
     uint64_t total_bytes = dir->size;
-    uint8_t *cur_blk;
     char name[MAX_NAME_LENGTH];
     while (block_count < total_blocks && byte_count < total_bytes)
     {
-        if (block_count < 12)
+        block = fetch_block(dir, block_count);
+        if (block == NULL)
         {
-            cur_blk = dir->direct_blocks[block_count];
-            if (cur_blk == NULL)
-                return -1;
-            for (uint64_t i = 0; i < BLOCKSIZE; i += PATH_BOUNDARY)
-            {
-                if (total_bytes < byte_count)
-                    return 0;
-                read_block(name, cur_blk, i, MAX_NAME_LENGTH);
-                if (name[0] != '\0')
-                    filler(buffer, name, NULL, 0, 0);
-                byte_count += PATH_BOUNDARY;
-            }
-            block_count++;
+            block++;
+            byte_count += BLOCKSIZE;
         }
-
-        else if (block_count < 12 + BLOCKSIZE / ADDR_LENGTH)
+        for (uint64_t i = 0; i < BLOCKSIZE && byte_count < total_bytes; i += PATH_BOUNDARY)
         {
-            uint8_t *indir_blk = dir->indirect_blocks;
-            if (indir_blk == NULL)
-                return -1;
-            for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
-            {
-                if (block_count > total_blocks || byte_count > total_bytes) // exit
-                    return 0;
-
-                memcpy(&cur_blk, indir_blk + i, ADDR_LENGTH); // get next block
-                if (cur_blk == 0 || cur_blk == NULL)          // skip if invalid address
-                {
-                    block_count++;
-                    byte_count += BLOCKSIZE;
-                    continue;
-                }
-
-                for (uint64_t j = 0; j < BLOCKSIZE; j += PATH_BOUNDARY) // read block addresses
-                {
-                    if (total_bytes < byte_count)
-                        return 0;
-                    read_block(name, cur_blk, j, MAX_NAME_LENGTH);
-                    if (name[0] != '\0')
-                        filler(buffer, name, NULL, 0, 0);
-                    byte_count += PATH_BOUNDARY;
-                }
-                block_count++;
-            }
+            read_block(name, block, i, MAX_NAME_LENGTH);
+            byte_count += PATH_BOUNDARY;
+            if (name[0] == '\0')
+                continue;
+            filler(buffer, name, NULL, 0, 0);
         }
-
-        else if (block_count < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2))
-        {
-            uint8_t *indir_blk = NULL;
-            uint8_t *dbl_blk = dir->dbl_indirect;
-            if (dbl_blk == NULL)
-                return -1;
-            for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
-            {
-                if (block_count > total_blocks || byte_count > total_bytes) // exit
-                    return 0;
-                memcpy(&indir_blk, dbl_blk + i, ADDR_LENGTH);
-                if (indir_blk == 0 || indir_blk == NULL)
-                {
-                    byte_count += BLOCKSIZE / ADDR_LENGTH * BLOCKSIZE;
-                    block_count += BLOCKSIZE / ADDR_LENGTH;
-                    continue;
-                }
-
-                for (int j = 0; j < BLOCKSIZE; j += ADDR_LENGTH)
-                {
-                    if (block_count > total_blocks || byte_count > total_bytes) // exit
-                        return 0;
-
-                    memcpy(&cur_blk, indir_blk + j, ADDR_LENGTH); // get next block
-                    if (cur_blk == 0 || cur_blk == NULL)          // skip if invalid address
-                    {
-                        block_count++;
-                        byte_count += BLOCKSIZE;
-                        continue;
-                    }
-
-                    for (uint64_t k = 0; k < BLOCKSIZE; k += PATH_BOUNDARY) // read block addresses
-                    {
-                        if (total_bytes < byte_count)
-                            return 0;
-                        read_block(name, cur_blk, k, MAX_NAME_LENGTH);
-                        if (name[0] != '\0')
-                            filler(buffer, name, NULL, 0, 0);
-                        byte_count += PATH_BOUNDARY;
-                    }
-                    block_count++;
-                }
-            }
-        }
-
-        else if (block_count < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2) + pow(BLOCKSIZE / ADDR_LENGTH, 3))
-        {
-            uint8_t *indir_blk = NULL;
-            uint8_t *dbl_blk = NULL;
-            uint8_t *trpl_blk = dir->trpl_indirect;
-            if (trpl_blk == NULL)
-                return -1;
-            for (uint64_t trpl = 0; trpl < BLOCKSIZE; trpl += ADDR_LENGTH)
-            {
-                if (block_count > total_blocks || byte_count > total_bytes) // exit
-                    return 0;
-                memcpy(&dbl_blk, trpl_blk + trpl, ADDR_LENGTH);
-                if (dbl_blk == 0 || dbl_blk == NULL)
-                {
-                    byte_count += pow(BLOCKSIZE / ADDR_LENGTH, 2) * BLOCKSIZE;
-                    block_count += pow(BLOCKSIZE / ADDR_LENGTH, 2);
-                    continue;
-                }
-
-                for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
-                {
-                    if (block_count > total_blocks || byte_count > total_bytes) // exit
-                        return 0;
-                    memcpy(&indir_blk, dbl_blk + i, ADDR_LENGTH);
-                    if (indir_blk == 0 || indir_blk == NULL)
-                    {
-                        byte_count += BLOCKSIZE / ADDR_LENGTH * BLOCKSIZE;
-                        block_count += BLOCKSIZE / ADDR_LENGTH;
-                        continue;
-                    }
-
-                    for (int j = 0; j < BLOCKSIZE; j += ADDR_LENGTH)
-                    {
-                        if (block_count > total_blocks || byte_count > total_bytes) // exit
-                            return 0;
-
-                        memcpy(&cur_blk, indir_blk + j, ADDR_LENGTH); // get next block
-                        if (cur_blk == 0 || cur_blk == NULL)          // skip if invalid address
-                        {
-                            block_count++;
-                            byte_count += BLOCKSIZE;
-                            continue;
-                        }
-
-                        for (uint64_t k = 0; k < BLOCKSIZE; k += PATH_BOUNDARY) // read block addresses
-                        {
-                            if (total_bytes < byte_count)
-                                return 0;
-                            read_block(name, cur_blk, k, MAX_NAME_LENGTH);
-                            if (name[0] != '\0')
-                                filler(buffer, name, NULL, 0, 0);
-                            byte_count += PATH_BOUNDARY;
-                        }
-                        block_count++;
-                    }
-                }
-            }
-        }
-    } // end while
+        block_count++;
+    }
     return 0;
 }
 
-int tfs_open(const char *path, struct fuse_file_info *fi){
-    node * cur_node = find_path_node(path);
-    if(cur_node == NULL)
+int tfs_open(const char *path, struct fuse_file_info *fi)
+{
+    node *cur_node = find_path_node(path);
+    if (cur_node == NULL)
         return -1;
     uint32_t flags = 0;
-    switch(fi->flags & O_ACCMODE){
-        case O_RDWR:
-            flags = flags | 0666;
-            break;
-        case O_RDONLY:
-            flags = flags | 0444;
-            break;
-        case O_WRONLY:
-            flags = flags | 0222;
-            break;
+    switch (fi->flags & O_ACCMODE)
+    {
+    case O_RDWR:
+        flags = flags | 0666;
+        break;
+    case O_RDONLY:
+        flags = flags | 0444;
+        break;
+    case O_WRONLY:
+        flags = flags | 0222;
+        break;
     }
-    if(flags & cur_node->mode){
-        fi->fh = &cur_node;//fh is a uint64_t that can be used to store data during open or release
-        //fh gets called when reading and writing so very useful to store inode address here
+    if (flags & cur_node->mode)
+    {
+        fi->fh = &cur_node; // fh is a uint64_t that can be used to store data during open or release
+        // fh gets called when reading and writing so very useful to store inode address here
         return 0;
     }
     return -1;
@@ -397,6 +263,84 @@ int tfs_write(const char *path, const char *buf, size_t size, off_t offset, stru
     }
 }
 
+/// @brief read a file's data with given size and offset
+/// @param path path of file
+/// @param buff buffer to put data into
+/// @param size amount of data requested to be read
+/// @param offset offset to read from
+/// @param fi fuse file info we wont use
+/// @return amount of actually read data
+int tfs_read(const char *path, char * buff, size_t size, off_t offset, struct fuse_file_info *fi)
+{
+    node * cur_node = find_path_node(path);
+    if(cur_node == NULL)
+        return -1;
+    
+    uint64_t total_bytes = cur_node->size;
+    uint64_t total_blocks = cur_node->blocks;
+    uint64_t bytes = 0;
+    if(offset >= total_bytes)
+        return -1;
+    uint64_t blocks = offset / BLOCKSIZE;
+    uint64_t loc = offset % BLOCKSIZE;
+    uint64_t byte_counter = offset + size > total_bytes ? total_bytes-offset : size;
+    uint8_t * block = NULL;
+    uint64_t tmp = 0;
+    while(byte_counter != 0 && blocks < total_blocks) {//strong condition with total blocks in case something is wrong with read block
+        block = fetch_block(cur_node, blocks);
+        tmp = read_block(buff + bytes, block, loc, byte_counter);
+        bytes += tmp;
+        byte_counter -= tmp;
+        loc = 0;
+        blocks++;
+    }
+    return bytes;
+}
+
+/// @brief write file data with given size and offset
+/// @param path path of file
+/// @param buff buffer that has write data
+/// @param size amount of data requested to be written
+/// @param offset offset to read from
+/// @param fi fuse file info we wont use
+/// @return amount of actually written data
+int tfs_write(const char *path, const char * buff, size_t size, off_t offset, struct fuse_file_info *fi){
+    node * cur_node = find_path_node(path);
+    if(cur_node == NULL)
+        return -1;
+    
+    uint64_t total_bytes = cur_node->size;
+    uint64_t total_blocks = cur_node->blocks;
+    uint64_t bytes = 0;
+    uint64_t blocks = offset / BLOCKSIZE;
+    uint64_t loc = offset % BLOCKSIZE;
+    uint64_t byte_counter = size;
+    uint8_t * block = NULL;
+    uint64_t tmp = 0;
+    uint8_t skip_fetch = 0;
+    while(byte_counter != 0 && blocks < total_blocks) {
+        if(skip_fetch == 0)//use skip fetch to avoid fetch when allocating more blocks for performance
+            block = fetch_block(cur_node, blocks);
+        else
+            skip_fetch == 0;
+        tmp = write_block(buff + bytes, block, loc, byte_counter);//see how many bytes we were able to write
+        if(tmp == 0 || blocks == total_blocks - 1){//full block or bad offset for tmp == 0; otherwise need to allocate a new block
+            block = add_block_to_node(memspace, cur_node);//automatically increases cur_node->blocks by 1
+            if(block == NULL){
+                cur_node->size = total_bytes > (uint64_t)offset + bytes ? total_bytes : (uint64_t)offset + bytes;
+                return bytes;
+            }
+            skip_fetch = 1;//skip fetch in next cycle so we use new block
+            total_blocks++;
+        }
+        bytes += tmp;//increase bytes written
+        byte_counter -= tmp;//decrease bytes left to write
+        loc = 0;//loc = 0 virtually every time except the first time of the loop where offset can start not at block beginning
+        blocks++;//increment to next block we plan to fetch
+    }
+    cur_node->size = total_bytes > (uint64_t)offset + bytes ? total_bytes : (uint64_t)offset + bytes;
+    return bytes;   
+}
 
 static struct fuse_operations operations = {
     .mkdir = tfs_mkdir,

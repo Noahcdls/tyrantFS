@@ -8,7 +8,7 @@
 #define BLOCKSIZE 4096
 #define MEMSIZE 1024*1024*1024 //1GB
 #define END_OF_INODE 3 //3 is first data block, 2 is last inode
-#define NUM_FREE_BLOCKS 64
+#define NUM_FREE_BLOCKS 1024
 #define ADDR_LENGTH sizeof(uint8_t*)
 
 
@@ -58,7 +58,8 @@ void *allocate_inode(void *fs_space);
 int free_inode(void *inode);
 int read_inode(void * inode, void * buff);
 int write_inode(void * inode, void * buff);
-uint32_t read_block(void *buff, void* block, off_t offset, uint32_t bytes);
-uint32_t write_block(void *buff, void* block, off_t offset, uint32_t bytes);
+uint32_t read_block(void *buff, void* block, off_t offset, uint64_t bytes);
+uint32_t write_block(void *buff, void* block, off_t offset, uint64_t bytes);
 void * allocate_block(void* fs_space);
 int free_block(void* fs_space, void * block);
+void * fetch_block(void * my_node, uint64_t block_no);
