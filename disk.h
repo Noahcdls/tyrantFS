@@ -31,13 +31,13 @@ struct inode{
     uint8_t * dbl_indirect;
     uint8_t * trpl_indirect;//holds block positions for blocks
     uint32_t flags;
+    uint8_t * fil_space;
     uint32_t checksum;
     
 
 };
 typedef struct inode node;
 
- 
 #define INODE_SIZE_BOUNDARY (uint32_t)pow(2, ceil(log(sizeof(node))/log(2)))
 
 #define IFIFO     0x1000  //FIFO

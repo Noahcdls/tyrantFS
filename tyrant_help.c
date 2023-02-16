@@ -42,36 +42,68 @@ void *add_block_to_node(void *fs_space, node *parent)
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2)) // double indirect
     {
         uint8_t *indir_blk = NULL;
-        uint8_t *dbl_blk = cur_node->dbl_indirect;
+        uint8_t *dbl_blk = parent->dbl_indirect;
+        if(dbl_blk == NULL){
+            dbl_blk = allocate_block(fs_space);
+            if(dbl_blk == NULL){
+                free_block(fs_space, block);
+                return NULL;
+            }
+            parent->dbl_indirect = dbl_blk;
+        }
 
         uint64_t dbl_blk_offset = (i - 12 - BLOCKSIZE / ADDR_LENGTH) / (BLOCKSIZE / ADDR_LENGTH) * ADDR_LENGTH;
         uint64_t indir_blk_offset = (i - 12 - BLOCKSIZE / ADDR_LENGTH) % (BLOCKSIZE / ADDR_LENGTH) * ADDR_LENGTH;
-
-        if (dbl_blk == NULL)
-        {
-            return NULL;
+        read_block(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH);
+        if(indir_blk == NULL || indir_blk == 0){
+            indir_blk = allocate_block(fs_space);
+            if(indir_blk == NULL){
+                free_block(block);
+                return NULL;
+            }
+            write_block(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH);//write back new address
         }
-        memcpy(&indir_blk, dbl_blk + dbl_blk_offset, ADDR_LENGTH);
-        memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
-        return cur_blk;
+        write_block(&block, indir_blk, indir_blk_offset, ADDR_LENGTH);
+        return block;
     }
     else // triple indirect
     {
         uint8_t *indir_blk = NULL;
         uint8_t *dbl_blk = NULL;
-        uint8_t *trpl_blk = cur_node->trpl_indirect;
+        uint8_t *trpl_blk = parent->trpl_indirect;
+        if(trpl_blk == NULL){
+            trpl_blk = allocate_block(fs_space);
+            if(trpl_blk == NULL){
+                free_block(fs_space, block);
+                return NULL;
+            }
+            parent->trpl_indirect = trpl_blk;
+        }
 
         uint64_t trpl_blk_offset = (i - 12 - BLOCKSIZE / ADDR_LENGTH - (BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) / ((BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) * ADDR_LENGTH;
         uint64_t dbl_blk_offset = (i - 12 - BLOCKSIZE / ADDR_LENGTH - (BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) % ((BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) / (BLOCKSIZE / ADDR_LENGTH) * ADDR_LENGTH;
         uint64_t indir_blk_offset = (i - 12 - BLOCKSIZE / ADDR_LENGTH - (BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) % ((BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) % (BLOCKSIZE / ADDR_LENGTH) * ADDR_LENGTH;
-        if (trpl_blk == NULL)
-        {
-            return NULL;
+
+        read_blk(&dbl_blk, dbl_blk, trpl_blk_offset, ADDR_LENGTH);
+        if(dbl_blk == NULL || dbl_blk == 0){
+            dbl_blk = allocate_block(fs_space);
+            if(dbl_blk == NULL){
+                free_block(fs_space, block);
+                return NULL;
+            }
+            write_blk(&dbl_blk, dbl_blk, trpl_blk_offset, ADDR_LENGTH);
         }
-        memcpy(&dbl_blk, dbl_blk + trpl_blk_offset, ADDR_LENGTH);
-        memcpy(&indir_blk, dbl_blk + dbl_blk_offset, ADDR_LENGTH);
-        memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
-        return cur_blk;
+        read_block(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH);
+        if(indir_blk == NULL || indir_blk == 0){
+            indir_blk = allocate_block(fs_space);
+            if(indir_blk == NULL){
+                free_block(fs_space, block);
+                return NULL;
+            }
+            write_blk(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH);
+        }
+        write_blk(&block, indir_blk, indir_blk_offset, ADDR_LENGTH);
+        return block;
     }
 }
 
@@ -190,62 +222,79 @@ int add_addr(uint8_t *block, node *addr, char *name)
 */
 int add_to_directory(void *fs_space, node *parent, node *child, char *name)
 {
-    uint64_t num_blocks = parent->blocks;
-    if (num_blocks == 0) // an inode should at least have 1 block allocated
+    if(parent == NULL || child == NULL)
         return -1;
-    if (num_blocks <= 12) // direct
-    {
-        int result = add_addr(parent->direct_blocks[parent->blocks - 1], child, name);
-        if (result == -1) // block is full
-        {
-            uint8_t *blk_result = add_block_to_node(fs_space, parent);
-            if (blk_result == NULL)
-                return -1;
-            result = add_addr(blk_result, child, name);
-        }
-        parent->size += result < 0 ? 0 : NAME_BOUNDARY;
-        return result;
+    uint8_t* dir_space = parent->fil_space;//get pointer to open space
+    uint8_t* nxt_loc = NULL;
+    memcpy(&nxt_loc, dir_space+NAME_BOUNDARY-ADDR_LENGTH, ADDR_LENGTH);
+    if(nxt_loc == 0 || nxt_loc == NULL){
+        uint64_t offset = parent->size%BLOCKSIZE;
+        uint8_t * block = get_i_block(parent, parent->blocks-1);
+        parent->fil_space = block+offset;
     }
-    else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH) // indirect
-    {
-        uint64_t loc = parent->blocks - 12;
-        uint8_t *blk_from_indir = NULL;
-        read_block(&blk_from_indir, parent->indirect_blocks, (parent->blocks - 12 - 1) * ADDR_LENGTH, ADDR_LENGTH);
-        if (blk_from_indir == 0)
-            blk_from_indir = add_block_to_node(fs_space, parent);
-        int result = add_addr(blk_from_indir, child, name);
-        if (result == -1) // block is full
-        {
-            uint8_t *blk_result = add_block_to_node(fs_space, parent);
-            if (blk_result == NULL) // no more blocks to add to parent
-                return -1;
-            result = add_addr(blk_result, child, name);
-        }
-        parent->size += result < 0 ? 0 : NAME_BOUNDARY;
-        return result;
-    }
-    else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2)) // double indirect
-    {
-        uint64_t base = 12 + BLOCKSIZE / ADDR_LENGTH;
-        for (uint64_t i = 0; i <= pow(BLOCKSIZE / ADDR_LENGTH, 2); i += BLOCKSIZE / ADDR_LENGTH)
-        {
-            if (parent->blocks <= base + i)
-            {
-                uint8_t *indir_blk = NULL;
-                read_block(&indir_blk, parent->dbl_indirect, (i / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
-                uint64_t loc = parent->blocks - (base + i - BLOCKSIZE / ADDR_LENGTH) - 1;
-                uint8_t *blk_result = NULL;
-                read_block(&blk_result, indir_blk, loc * ADDR_LENGTH, ADDR_LENGTH);
-                int result = add_addr(blk_result, child, name);
-                if (result == -1)
-                {
-                    blk_result = add_block_to_node(fs_space, parent);
-                    result = add_addr(blk_result, child, name);
-                }
-                parent->size += result < 0 ? 0 : NAME_BOUNDARY;
-                return result;
-            }
-        }
+
+    memcpy(dir_space, name, NAME_BOUNDARY - ADDR_LENGTH);
+    memcpy(dir_space+NAME_BOUNDARY-ADDR_LENGTH, &child, ADDR_LENGTH);
+    return 0;
+
+
+
+    // uint64_t num_blocks = parent->blocks;
+    // if (num_blocks == 0) // an inode should at least have 1 block allocated
+    //     return -1;
+    // if (num_blocks <= 12) // direct
+    // {
+    //     int result = add_addr(parent->direct_blocks[parent->blocks - 1], child, name);
+    //     if (result == -1) // block is full
+    //     {
+    //         uint8_t *blk_result = add_block_to_node(fs_space, parent);
+    //         if (blk_result == NULL)
+    //             return -1;
+    //         result = add_addr(blk_result, child, name);
+    //     }
+    //     parent->size += result < 0 ? 0 : NAME_BOUNDARY;
+    //     return result;
+    // }
+    // else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH) // indirect
+    // {
+    //     uint64_t loc = parent->blocks - 12;
+    //     uint8_t *blk_from_indir = NULL;
+    //     read_block(&blk_from_indir, parent->indirect_blocks, (parent->blocks - 12 - 1) * ADDR_LENGTH, ADDR_LENGTH);
+    //     if (blk_from_indir == 0)
+    //         blk_from_indir = add_block_to_node(fs_space, parent);
+    //     int result = add_addr(blk_from_indir, child, name);
+    //     if (result == -1) // block is full
+    //     {
+    //         uint8_t *blk_result = add_block_to_node(fs_space, parent);
+    //         if (blk_result == NULL) // no more blocks to add to parent
+    //             return -1;
+    //         result = add_addr(blk_result, child, name);
+    //     }
+    //     parent->size += result < 0 ? 0 : NAME_BOUNDARY;
+    //     return result;
+    // }
+    // else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2)) // double indirect
+    // {
+    //     uint64_t base = 12 + BLOCKSIZE / ADDR_LENGTH;
+    //     for (uint64_t i = 0; i <= pow(BLOCKSIZE / ADDR_LENGTH, 2); i += BLOCKSIZE / ADDR_LENGTH)
+    //     {
+    //         if (parent->blocks <= base + i)
+    //         {
+    //             uint8_t *indir_blk = NULL;
+    //             read_block(&indir_blk, parent->dbl_indirect, (i / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
+    //             uint64_t loc = parent->blocks - (base + i - BLOCKSIZE / ADDR_LENGTH) - 1;
+    //             uint8_t *blk_result = NULL;
+    //             read_block(&blk_result, indir_blk, loc * ADDR_LENGTH, ADDR_LENGTH);
+    //             int result = add_addr(blk_result, child, name);
+    //             if (result == -1)
+    //             {
+    //                 blk_result = add_block_to_node(fs_space, parent);
+    //                 result = add_addr(blk_result, child, name);
+    //             }
+    //             parent->size += result < 0 ? 0 : NAME_BOUNDARY;
+    //             return result;
+    //         }
+    //     }
     }
     else // triple indirect
     {
