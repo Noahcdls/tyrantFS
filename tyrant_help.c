@@ -137,16 +137,10 @@ void *add_block_to_node(void *fs_space, node *parent)
 /// @brief Get the ith block of an inode
 /// @param cur_node node for the operation
 /// @param i index for the block in search
-/// @param buf buffer for storing the block data. Assumes that the buffer is at least one block size large.
 /// @return pointer to ith block success, NULL failure
-void *get_i_block(void *fs_space, node *cur_node, uint64_t i, void *buf){
-    //curnode and   
+void *get_i_block(node *cur_node, uint64_t i){
+    //curnode cannot be NULL
     if (cur_node == NULL){
-        return NULL;
-    }
-
-    //fs_space cannot be NULL;
-    if (fs_space==NULL){
         return NULL;
     }
 
@@ -164,14 +158,11 @@ void *get_i_block(void *fs_space, node *cur_node, uint64_t i, void *buf){
     if (i < 0) {
         return NULL;
     }
+
     uint8_t *cur_blk;
     if (i < 12)//direct
     {
         cur_blk = cur_node->direct_blocks[i];
-        if (cur_blk == NULL){
-            return NULL;
-        }
-        read_block(buf,cur_blk,0,BLOCKSIZE);
         return cur_blk;
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH)//indirect
@@ -183,7 +174,6 @@ void *get_i_block(void *fs_space, node *cur_node, uint64_t i, void *buf){
             return NULL;
         }
         memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
-        read_block(buf,cur_blk,0,BLOCKSIZE);
         return cur_blk;
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2))//double indirect
@@ -199,7 +189,6 @@ void *get_i_block(void *fs_space, node *cur_node, uint64_t i, void *buf){
         }
         memcpy(&indir_blk, dbl_blk + dbl_blk_offset, ADDR_LENGTH);
         memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
-        read_block(buf,cur_blk,0,BLOCKSIZE);
         return cur_blk;
         
     }
@@ -218,7 +207,6 @@ void *get_i_block(void *fs_space, node *cur_node, uint64_t i, void *buf){
         memcpy(&dbl_blk, dbl_blk + trpl_blk_offset, ADDR_LENGTH);
         memcpy(&indir_blk, dbl_blk + dbl_blk_offset, ADDR_LENGTH);
         memcpy(&cur_blk, indir_blk + indir_blk_offset, ADDR_LENGTH);
-        read_block(buf,cur_blk,0,BLOCKSIZE);
         return cur_blk;
     }
 
