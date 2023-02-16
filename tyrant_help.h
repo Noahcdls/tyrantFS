@@ -12,6 +12,6 @@ void *check_block(uint8_t *block, char *name);
 void *check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
 void *check_dbl_indirect_blk(uint8_t *block, char *name, int64_t *block_count);
 void *check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
-
+void *get_i_block(node *cur_node, uint64_t i);
 
 
