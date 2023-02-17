@@ -244,7 +244,7 @@ int tfs_unlink(const char *path){
     ///////////////////////////////////////PARENT SEARCH END
 
     // TODO: remove link from its parent
-    
+
     // Update links count
     cur_node->links -= 1;
 
@@ -255,8 +255,13 @@ int tfs_unlink(const char *path){
         if ((cur_node->mode & S_IFMT) == S_IFDIR) {
             for (int i=0;i<cur_node->blocks;i++){
                 uint8_t *block = get_i_block(cur_node,i);
-                // TODO: unlink each entry in the directory
-                tfs_unlink(); 
+                // TODO: unlink each entry (children dir or nod) in the block
+                for (i=0;i<BLOCKSIZE;i+=BLOCKSIZE/ADDR_LENGTH){
+                    // get the address of the inode?
+                    tfs_unlink(); 
+                }
+                
+                // put the whole block back to free list
                 free_block(memspace,block);
             }
         }
