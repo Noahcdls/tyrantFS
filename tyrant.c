@@ -67,7 +67,6 @@ int tfs_mkdir(const char *path, mode_t m)
     dir_node->direct_blocks[0] = block;
     dir_node->blocks = 1;
     dir_node->links = 1;
-    dir_node->fil_space = block;
     write_block(".", block, 0, sizeof("."));
     write_block(&dir_node, block, MAX_NAME_LENGTH, sizeof(dir_node));
 
