@@ -15,11 +15,11 @@ void *add_block_to_node(void *fs_space, node *parent)
     }
 
     uint64_t i = parent->blocks;
-    parent->blocks++;
 
     if (i < 12) // direct
     {
         parent->direct_blocks[i] = block;
+        parent->blocks++;
         return block;
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH) // indirect
@@ -38,6 +38,7 @@ void *add_block_to_node(void *fs_space, node *parent)
 
         uint64_t indir_blk_offset = (i - 12) * ADDR_LENGTH;
         write_block(&block, indir_blk, indir_blk_offset, ADDR_LENGTH);
+        parent->blocks++;
         return block;
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2)) // double indirect
@@ -69,6 +70,7 @@ void *add_block_to_node(void *fs_space, node *parent)
             write_block(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH); // write back new address
         }
         write_block(&block, indir_blk, indir_blk_offset, ADDR_LENGTH);
+        parent->blocks++;
         return block;
     }
     else // triple indirect
@@ -114,6 +116,7 @@ void *add_block_to_node(void *fs_space, node *parent)
             write_block(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH);
         }
         write_block(&block, indir_blk, indir_blk_offset, ADDR_LENGTH);
+        parent->blocks++;
         return block;
     }
 }
