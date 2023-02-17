@@ -134,6 +134,25 @@ void *add_block_to_node(void *fs_space, node *parent)
     return NULL;
 }
 
+/// @brief remove link of a dir/nod from a directory inode
+/// @param parent_node parent node
+/// @param cur_node child node
+/// @return 0 on success; -1 on failure
+int remove_link_from_parent(node *parent_node, node *cur_node){
+    for (int i=0;i<parent_node->blocks;i++){
+        uint8_t *block = get_i_block(cur_node,i);
+        for (int j=0; j<BLOCKSIZE;j+=NAME_BOUNDARY){
+            node *child = NULL;
+            read_block(&child,block,j+NAME_BOUNDARY-ADDR_LENGTH,ADDR_LENGTH);
+            if (child == cur_node){
+                bzero(block+j,ADDR_LENGTH);
+                return 0;
+            }
+        }
+    }
+    return -1;
+}
+
 /// @brief Get the ith block of an inode
 /// @param cur_node node for the operation
 /// @param i index for the block in search
