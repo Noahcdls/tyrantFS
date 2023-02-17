@@ -247,7 +247,7 @@ int add_addr(uint8_t *block, node *addr, char *name)
         if (*(block + i) == 0)                                                   // nothing written here
         {                                                                        // no name so can write over
             write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH);            // write name
-            write_block(&addr, block, NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
+            write_block(&addr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
             return 0;
         }
     }
