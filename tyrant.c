@@ -203,27 +203,78 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
 /// @brief Removes a file or a directory
 /// @param pathname file path
 /// @return 0 success, -1 failure
-int tfs_unlink(const char *pathname){
+int tfs_unlink(const char *path){
     // first check if the pathname is valid
-    node *cur_node = find_path_node(pathname);
+    node *cur_node = find_path_node(path);
     if (cur_node == NULL){
         return -1;
     }
 
     // cannot remove root
-    if(!strcmp(pathname, "/")) {    //if root, return -1 (operation not permitted)
+    if(!strcmp(path, "/")) {    //if root, return -1 (operation not permitted)
         return -1;
     }
-    //free all blocks that belong to 
-    for (int i=0;i<cur_node->blocks;i++){
-        uint8_t *block = get_i_block(cur_node,i);
-        free_block(memspace,block);
+
+    /////////////////////// start parent search
+    node *parent_node = NULL;
+    char *temp = malloc(sizeof(char) * (strlen(path) + 1));
+
+    int i;
+    strcpy(temp, path);
+    for (i = strlen(path) - 1; temp[i] != '/' && i >= 0; i--)
+        ; // check for last / to differentiate parent path from new directory
+    if (i == -1)
+    {
+        free(temp);
+        return -1; // invalid path
     }
 
-    // TODO: zero reference to the inode in parent.
+    temp[i] = 0; // terminate at / for full path
 
-    // free the inode
-    free_inode(cur_node);
+    if (i != 0) // '/' or root is the first byte
+        parent_node = find_path_node(temp);
+    else
+        parent_node = root;
+    if (parent_node == NULL)
+    {
+        free(temp);
+        return -1;
+    }
+
+    ///////////////////////////////////////PARENT SEARCH END
+
+    // TODO: remove link from its parent
+    
+    // Update links count
+    cur_node->links -= 1;
+
+    // if links count is 0, remove the file/directory
+    if (cur_node->links == 0){
+
+        // if it is a directory, unlink everything in it before freeing block
+        if ((cur_node->mode & S_IFMT) == S_IFDIR) {
+            for (int i=0;i<cur_node->blocks;i++){
+                uint8_t *block = get_i_block(cur_node,i);
+                // TODO: unlink each entry in the directory
+                tfs_unlink(); 
+                free_block(memspace,block);
+            }
+        }
+        else{
+            //free all blocks that belong to this inode
+            for (int i=0;i<cur_node->blocks;i++){
+                uint8_t *block = get_i_block(cur_node,i);
+                free_block(memspace,block);
+            }
+        }
+        
+
+        // free the inode
+        free_inode(cur_node);
+    }
+    return 0;
+
+    
     
 }
 
