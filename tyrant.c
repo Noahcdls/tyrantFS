@@ -383,6 +383,10 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
     return bytes;
 }
 
+int tfs_flush(const char *path, struct fuse_file_info *fi){
+    return 0;//we already write back data on write so we are good to leave flush alone. Flush should be used if we want to log our data or send it somewhere else too
+}
+
 static struct fuse_operations operations = {
     .mkdir = tfs_mkdir,
     .mknod = tfs_mknod,
@@ -390,7 +394,7 @@ static struct fuse_operations operations = {
     .readdir = tfs_readdir,
     // .rmdir = tfs_rmdir,
     .open = tfs_open,
-    .flush = tfs_flush, // close() operation stuff
+    .flush = tfs_flush, // close() operation stuff. Pretty much finish writing data if you havent yet and have it stored somewhere
     .read = tfs_read,
     .write = tfs_write,
     // .create = tfs_create,
