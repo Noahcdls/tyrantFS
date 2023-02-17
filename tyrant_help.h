@@ -13,7 +13,7 @@ void *check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
 void *check_dbl_indirect_blk(uint8_t *block, char *name, int64_t *block_count);
 void *check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
 void *get_i_block(node *cur_node, uint64_t i);
-int remove_link_from_parent(node *parent_node, node *cur_node);
+int remove_link_from_parent(void * fs_space, node *parent_node, node *cur_node);
 int sub_unlink(void * fs_space, node * parent, node * child);
 
 

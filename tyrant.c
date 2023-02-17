@@ -249,7 +249,7 @@ int tfs_unlink(const char *path)
     ///////////////////////////////////////PARENT SEARCH END
 
     // remove link from its parent
-    int status = remove_link_from_parent(parent_node, cur_node);
+    int status = remove_link_from_parent(memspace, parent_node, cur_node);
     if (status == -1)
     {
         // something is wrong, as we cannot find child from parent

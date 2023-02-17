@@ -31,7 +31,6 @@ struct inode{
     uint8_t * dbl_indirect;
     uint8_t * trpl_indirect;//holds block positions for blocks
     uint32_t flags;
-    uint8_t * fil_space;
     uint32_t checksum;
     
 
