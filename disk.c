@@ -355,7 +355,7 @@ void *fetch_block(void * my_node, uint64_t block_no)
         uint8_t *dbl_blk = NULL;
         uint8_t *indir_blk = NULL;
         uint64_t trpl_offset = block_no - (12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2));
-        for (uint64_t i = 0; i < pow(BLOCKSIZE / ADDR_LENGTH, 3), i += pow(BLOCKSIZE / ADDR_LENGTH, 2))
+        for (uint64_t i = 0; i < pow(BLOCKSIZE / ADDR_LENGTH, 3); i += pow(BLOCKSIZE / ADDR_LENGTH, 2))
         {
             if (trpl_offset < i)
             {
