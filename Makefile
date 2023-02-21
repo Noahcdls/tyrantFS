@@ -13,4 +13,4 @@ disk.o: disk.c
 	$(CC) -c disk.c
 
 clean:
-	rm -r *.o
+	rm -r tyrantfs
