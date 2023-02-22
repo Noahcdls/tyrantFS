@@ -2,27 +2,34 @@
 
 void *add_block_to_node(void *fs_space, node *parent)
 {
-    if (parent == NULL)
+    if (parent == NULL){
+        printf("NULL PARENT\n\n");
         return NULL;
+    }
     uint8_t *block = allocate_block(fs_space);
-    if (block == NULL)
+    if (block == NULL){
+        printf("NO MORE BLOCKS: ADD BLOCK TO NODE\n\n");//
         return NULL;
+    }
     if (parent->blocks == UINT64_MAX)
     {
+        printf("HIT MAX BLOCKS\n\n");
         free_block(fs_space, block);
         return NULL;
     }
-
+    printf("INSERTING BLOCK\n\n");
     uint64_t i = parent->blocks;
 
     if (i < 12) // direct
     {
+        printf("INSERTING INTO DIRECT\n\n");
         parent->direct_blocks[i] = block;
         parent->blocks++;
         return block;
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH) // indirect
     {
+        printf("INSERTING INTO INDIRECT\n\n");
         uint8_t *indir_blk = parent->indirect_blocks;
         if (indir_blk == NULL)
         {
@@ -42,6 +49,7 @@ void *add_block_to_node(void *fs_space, node *parent)
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2)) // double indirect
     {
+        printf("INSERTING INTO DBL INDIRECT\n\n");
         uint8_t *indir_blk = NULL;
         uint8_t *dbl_blk = parent->dbl_indirect;
         if (dbl_blk == NULL)
@@ -74,6 +82,7 @@ void *add_block_to_node(void *fs_space, node *parent)
     }
     else // triple indirect
     {
+        printf("INSERTING INTO TRPL INDIRECT\n\n");
         uint8_t *indir_blk = NULL;
         uint8_t *dbl_blk = NULL;
         uint8_t *trpl_blk = parent->trpl_indirect;
@@ -450,14 +459,14 @@ and return address
 */
 void *check_block(uint8_t *block, char *name)
 {
-    printf("Searching for %s", name);
+    printf("Searching for %s\n", name);
     if (block == NULL)
         return NULL;
     char tmp_name[NAME_BOUNDARY - ADDR_LENGTH + 1];
     for (int i = 0; i < BLOCKSIZE; i += NAME_BOUNDARY)
     {
         memcpy(tmp_name, block + i, NAME_BOUNDARY - ADDR_LENGTH); // copy name
-        printf("%s is %d\n", tmp_name, strcmp(tmp_name, name));
+        // printf("%s is %d\n", tmp_name, strcmp(tmp_name, name));
         if (strcmp(tmp_name, name) == 0) // found a match in the name
         {
             node *node_ptr = NULL;

@@ -318,7 +318,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
     node *cur_node = find_path_node((char *)path);
     if (cur_node == NULL)
         return -1;
-
+    printf("READING\n\n");
     uint64_t total_bytes = cur_node->size;
     uint64_t total_blocks = cur_node->blocks;
     uint64_t bytes = 0;
@@ -338,6 +338,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
         loc = 0;
         blocks++;
     }
+    printf("READ %lu BYTES\n\n", bytes);
     return bytes;
 }
 
@@ -345,7 +346,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
 /// @param path path of file
 /// @param buff buffer that has write data
 /// @param size amount of data requested to be written
-/// @param offset offset to read from
+/// @param offset offset to write from
 /// @param fi fuse file info we wont use
 /// @return amount of actually written data
 int tfs_write(const char *path, const char *buff, size_t size, off_t offset, struct fuse_file_info *fi)
@@ -353,7 +354,7 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
     node *cur_node = find_path_node((char *)path);
     if (cur_node == NULL)
         return -1;
-
+    printf("WRITING. CURRENTLY HAS %lu blocks. REQUESTING %lu BYTES\n\n", cur_node->blocks, size);
     uint64_t total_bytes = cur_node->size;
     uint64_t total_blocks = cur_node->blocks;
     uint64_t bytes = 0;
@@ -362,38 +363,56 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
     uint64_t byte_counter = size;
     uint8_t *block = NULL;
     uint64_t tmp = 0;
-    uint8_t skip_fetch = 0;
+    if(size + offset > total_bytes){//add new blocks if we dont have enough for write
+        uint64_t final_blocks = (size+offset)/BLOCKSIZE + ((size+offset)%BLOCKSIZE == 0 ? 0 : 1);
+        for(uint64_t i = total_blocks; i < final_blocks; i++){
+            block = add_block_to_node(memspace, cur_node);
+            if(block == NULL)
+                break;
+        }
+    }
+    total_blocks = cur_node->blocks;
+    
+
     while (byte_counter != 0 && blocks < total_blocks)
     {
-        if (skip_fetch == 0) // use skip fetch to avoid fetch when allocating more blocks for performance
-            block = get_i_block(cur_node, blocks);
-        else
-            skip_fetch = 0;
+        block = get_i_block(cur_node, blocks);
         tmp = write_block((uint8_t*)(buff + bytes), block, loc, byte_counter); // see how many bytes we were able to write
-        if (tmp == 0 || blocks == total_blocks - 1)
-        {                                                  // full block or bad offset for tmp == 0; otherwise need to allocate a new block
-            block = add_block_to_node(memspace, cur_node); // automatically increases cur_node->blocks by 1
-            if (block == NULL)
-            {
-                cur_node->size = total_bytes > (uint64_t)offset + bytes ? total_bytes : (uint64_t)offset + bytes;
-                return bytes;
-            }
-            skip_fetch = 1; // skip fetch in next cycle so we use new block
-            total_blocks++;
-        }
         bytes += tmp;        // increase bytes written
+        printf("BYTES LEFT %lu\n\n", bytes);
         byte_counter -= tmp; // decrease bytes left to write
         loc = 0;             // loc = 0 virtually every time except the first time of the loop where offset can start not at block beginning
         blocks++;            // increment to next block we plan to fetch
     }
     cur_node->size = total_bytes > (uint64_t)offset + bytes ? total_bytes : (uint64_t)offset + bytes;
+    printf("FINISHED WRITING %lu BYTES\n\n", bytes);
     return bytes;
+}
+
+int tfs_truncate(const char * path, off_t length){
+    node * cur_node = find_path_node((char *) path);
+    if(cur_node == NULL)
+        return -ENOENT;
+
+    if(cur_node->size <= length)
+        return 0;
+    uint64_t block_no = length/BLOCKSIZE;
+    uint8_t * block = get_i_block(cur_node, block_no);
+    for(uint32_t i = block_no+1; i < cur_node->blocks; i++){
+        block = get_i_block(cur_node, i);
+        free_block(memspace, block);
+    }
+    cur_node->size = length;
+    cur_node->blocks = cur_node->blocks - (block_no + 1);
+    return 0;
 }
 
 int tfs_getattr(const char * path, struct stat * st){
     node * cur_node = find_path_node((char *)path);
-    if(cur_node == NULL)
+    if(cur_node == NULL){
+        printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
+    }
     st->st_ino = (uint64_t)((uint8_t*)cur_node - memspace - BLOCKSIZE)/INODE_SIZE_BOUNDARY;
     st->st_mode = cur_node->mode;
     st->st_nlink = cur_node->links;
@@ -417,6 +436,7 @@ static const struct fuse_operations operations = {
     .flush = &tfs_flush, // close() operation stuff. Pretty much finish writing data if you havent yet and have it stored somewhere
     .read = &tfs_read,
     .write = &tfs_write,
+    .truncate = &tfs_truncate,
     // .create = tfs_create,
     // .rename = tfs_rename
     .unlink = &tfs_unlink
