@@ -70,7 +70,10 @@ int tfs_mkdir(const char *path, mode_t m)
     bzero(block, BLOCKSIZE);
     // https://jameshfisher.com/2017/02/24/what-is-mode_t/
     // what mode_t means
-    dir_node->creation_time = time(NULL);
+    dir_node->creation_time = get_current_time_in_nsec();
+    dir_node->access_time = dir_node->creation_time;
+    dir_node->change_time = dir_node->creation_time;
+    dir_node->data_time = dir_node->creation_time;
     dir_node->mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
     dir_node->mode |= S_IFDIR;
     dir_node->direct_blocks[0] = block;
@@ -140,6 +143,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     data_node->creation_time = get_current_time_in_nsec();
     data_node->access_time = data_node->creation_time;
     data_node->change_time = data_node->creation_time;
+    data_node->data_time = data_node->creation_time;
     int result = add_to_directory(memspace, parent_node, data_node, (temp + i + 1));
     if (result != 0)
     {
@@ -170,6 +174,7 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
     uint64_t byte_count = 0;
     uint64_t total_blocks = dir->blocks;
     uint64_t total_bytes = dir->size;
+    dir->access_time = get_current_time_in_nsec();
     char name[MAX_NAME_LENGTH];
     while (block_count < total_blocks && byte_count < total_bytes)
     {
@@ -198,6 +203,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
     node *cur_node = find_path_node((char*)path);
     if (cur_node == NULL)
         return -1;
+    cur_node->access_time = get_current_time_in_nsec();
     uint32_t flags = 0;
     switch (fi->flags & O_ACCMODE)
     {
@@ -340,6 +346,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
     uint64_t byte_counter = offset + size > total_bytes ? total_bytes - offset : size;
     uint8_t *block = NULL;
     uint64_t tmp = 0;
+    cur_node->access_time = get_current_time_in_nsec();
     while (byte_counter != 0 && blocks < total_blocks)
     { // strong condition with total blocks in case something is wrong with read block
         block = get_i_block(cur_node, blocks);
@@ -374,6 +381,9 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
     uint64_t byte_counter = size;
     uint8_t *block = NULL;
     uint64_t tmp = 0;
+    cur_node->access_time = get_current_time_in_nsec();
+    cur_node->data_time = cur_node->access_time;
+    cur_node->change_time = cur_node->access_time;
     if(size + offset > total_bytes){//add new blocks if we dont have enough for write
         uint64_t final_blocks = (size+offset)/BLOCKSIZE + ((size+offset)%BLOCKSIZE == 0 ? 0 : 1);
         for(uint64_t i = total_blocks; i < final_blocks; i++){
@@ -413,6 +423,9 @@ int tfs_truncate(const char * path, off_t length){
         block = get_i_block(cur_node, i);
         free_block(memspace, block);
     }
+    cur_node->access_time = get_current_time_in_nsec();
+    cur_node->change_time = cur_node->access_time;
+    cur_node->data_time = cur_node->access_time;
     cur_node->size = length;
     cur_node->blocks = cur_node->blocks - (block_no + 1);
     return 0;
