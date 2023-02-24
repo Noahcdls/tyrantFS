@@ -16,6 +16,8 @@
         "disk.h": "c",
         "unistd.h": "c",
         "time_t.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "statvfs.h": "c",
+        "statfs.h": "c"
     }
 }

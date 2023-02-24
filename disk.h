@@ -9,7 +9,7 @@
 #define MEMSIZE 1024*1024*1024 //1GB
 #define END_OF_INODE 3 //3 is first data block, 2 is last inode
 #define NUM_FREE_BLOCKS 1024
-#define ADDR_LENGTH sizeof(void *)
+#define ADDR_LENGTH sizeof(uint64_t)//update to uint64_t for disk since it's an offset
 
 
 //ext4 stuff but worth copying some over
@@ -26,10 +26,10 @@ struct inode{
     uint64_t deletion_time;
     uint32_t links;//linked count
     uint64_t blocks;//number of blocks used
-    uint8_t * direct_blocks[12];
-    uint8_t * indirect_blocks;
-    uint8_t * dbl_indirect;
-    uint8_t * trpl_indirect;//holds block positions for blocks
+    uint64_t direct_blocks[12];
+    uint64_t indirect_blocks;
+    uint64_t dbl_indirect;
+    uint64_t trpl_indirect;//holds block positions for blocks
     uint32_t flags;
     uint32_t checksum;
     
@@ -48,17 +48,18 @@ typedef struct inode node;
 #define IFSOCK    0xC000  //Socket
 
 
-extern node * root_node;
+// extern node * root_node;
+extern uint64_t root_node;//offset to root
 #define NAME_BOUNDARY 64
 
 
-int tfs_mkfs(void *fs_space);
-void *allocate_inode(void *fs_space);
-int free_inode(void *inode);
-int read_inode(void * inode, void * buff);
-int write_inode(void * inode, void * buff);
-uint32_t read_block(void *buff, void* block, off_t offset, uint64_t bytes);
-uint32_t write_block(void *buff, void* block, off_t offset, uint64_t bytes);
-void * allocate_block(void* fs_space);
-int free_block(void* fs_space, void * block);
-void * fetch_block(void * my_node, uint64_t block_no);
+int tfs_mkfs(int fd);
+uint64_t allocate_inode(int fd);
+int free_inode(uint64_t inode);
+int read_inode(uint64_t inode, void * buff);
+int write_inode(uint64_t inode, void * buff);
+uint32_t read_block(void *buff, uint64_t block, off_t offset, uint64_t bytes);
+uint32_t write_block(void *buff, uint64_t block, off_t offset, uint64_t bytes);
+uint64_t allocate_block(int fd);
+int free_block(int fd, uint64_t block);
+uint64_t fetch_block(uint64_t my_node, uint64_t block_no);

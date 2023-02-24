@@ -7,6 +7,8 @@
 #include <fuse.h>
 #include "tyrant.h"
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <sys/mount.h>
 
 uint8_t *memspace = NULL;
 /*
@@ -445,7 +447,13 @@ static const struct fuse_operations operations = {
 
 int main(int argc, char **argv)
 {
-    memspace = malloc(MEMSIZE);
-    tfs_mkfs(memspace);
+    if(argc < 2)
+        return -1;
+    int fd = open(argv[1], O_RDWR, 0666);
+    if(fd < 0)
+        return fd;
+    int setup = tfs_mkfs(fd);
+    if(setup == -1)
+        return -1;
     return fuse_main(argc, argv, &operations);
 }
