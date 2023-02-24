@@ -1,5 +1,12 @@
 #include "tyrant_help.h"
 
+uint64_t get_current_time_in_nsec()
+{
+    time_t current_time;
+    time(&current_time);
+    return (uint64_t) current_time;
+}
+
 void *add_block_to_node(void *fs_space, node *parent)
 {
     if (parent == NULL){
@@ -163,6 +170,7 @@ int remove_link_from_parent(void * fs_space, node *parent_node, node *cur_node)
                     free_block(fs_space, last_block);
                     parent_node->blocks--;
                 }
+                parent_node->data_time = get_current_time_in_nsec();
                 return 0;
             }
         }
@@ -331,6 +339,7 @@ int add_addr(node *parent, uint8_t *block, node *addr, char *name)
             printf("%p added as address\n", addr);
             parent->size += NAME_BOUNDARY;
             addr->links++;
+            parent->data_time = get_current_time_in_nsec();
             return 0;
         }
     }

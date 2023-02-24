@@ -11,12 +11,7 @@
 
 uint8_t *memspace = NULL;
 
-uint64_t get_current_time_in_nsec()
-{
-    time_t current_time;
-    time(&current_time);
-    return (uint64_t) current_time;
-}
+
 
 /*
 @brief make a directory path by allocating an inode and adding it to the directory list
