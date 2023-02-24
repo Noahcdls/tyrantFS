@@ -13,10 +13,9 @@ uint8_t *memspace = NULL;
 
 uint64_t get_current_time_in_nsec()
 {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    uint64_t nsec = ts.tv_sec * 1000000000 + ts.tv_nsec;
-    return nsec;
+    time_t current_time;
+    time(&current_time);
+    return (uint64_t) current_time;
 }
 
 /*
