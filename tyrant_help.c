@@ -171,6 +171,7 @@ int remove_link_from_parent(void * fs_space, node *parent_node, node *cur_node)
                     parent_node->blocks--;
                 }
                 parent_node->data_time = get_current_time_in_nsec();
+                parent_node->change_time = parent_node->data_time;
                 return 0;
             }
         }
@@ -340,6 +341,7 @@ int add_addr(node *parent, uint8_t *block, node *addr, char *name)
             parent->size += NAME_BOUNDARY;
             addr->links++;
             parent->data_time = get_current_time_in_nsec();
+            parent->change_time = parent->data_time;
             return 0;
         }
     }

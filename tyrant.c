@@ -376,7 +376,6 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
     uint64_t byte_counter = size;
     uint8_t *block = NULL;
     uint64_t tmp = 0;
-    cur_node->access_time = get_current_time_in_nsec();
     cur_node->data_time = cur_node->access_time;
     cur_node->change_time = cur_node->access_time;
     if(size + offset > total_bytes){//add new blocks if we dont have enough for write
@@ -418,7 +417,6 @@ int tfs_truncate(const char * path, off_t length){
         block = get_i_block(cur_node, i);
         free_block(memspace, block);
     }
-    cur_node->access_time = get_current_time_in_nsec();
     cur_node->change_time = cur_node->access_time;
     cur_node->data_time = cur_node->access_time;
     cur_node->size = length;
