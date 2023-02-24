@@ -407,17 +407,35 @@ int tfs_truncate(const char * path, off_t length){
     return 0;
 }
 
+// @brief convert a uint64 to timespec struct. Assumes input represents a number of nanoseconds
+struct timespec uint64_to_timespec(uint64_t input)
+{
+    struct timespec result;
+    result.tv_sec = input / 1000000000;
+    result.tv_nsec = input % 1000000000;
+    return result;
+}
+
 int tfs_getattr(const char * path, struct stat * st){
     node * cur_node = find_path_node((char *)path);
     if(cur_node == NULL){
         printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
+    memset(st, 0, sizeof(struct stat));
+
     st->st_ino = (uint64_t)((uint8_t*)cur_node - memspace - BLOCKSIZE)/INODE_SIZE_BOUNDARY;
     st->st_mode = cur_node->mode;
     st->st_nlink = cur_node->links;
     st->st_size = cur_node->size;
     st->st_blocks = cur_node->blocks;
+
+    st->st_uid = cur_node->user_id;
+    st->st_gid = cur_node->group_id;
+    st->st_blksize = BLOCKSIZE;
+    st->st_atimespec = uint64_to_timespec(cur_node->access_time);
+    st->st_mtimespec = uint64_to_timespec(cur_node->data_time);
+    st->st_ctimespec = uint64_to_timespec(cur_node->change_time);
 
     return 0;
 }
