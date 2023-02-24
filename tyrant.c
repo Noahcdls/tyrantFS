@@ -7,8 +7,18 @@
 #include <fuse.h>
 #include "tyrant.h"
 #include <errno.h>
+#include <time.h>
 
 uint8_t *memspace = NULL;
+
+uint64_t get_current_time_in_nsec()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    uint64_t nsec = ts.tv_sec * 1000000000 + ts.tv_nsec;
+    return nsec;
+}
+
 /*
 @brief make a directory path by allocating an inode and adding it to the directory list
 @param path pathname of new directory
@@ -128,7 +138,9 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     data_node->links = 1;
     data_node->blocks = 0;
     data_node->size = 0;
-    data_node->creation_time = time(NULL);
+    data_node->creation_time = get_current_time_in_nsec();
+    data_node->access_time = data_node->creation_time;
+    data_node->change_time = data_node->creation_time;
     int result = add_to_directory(memspace, parent_node, data_node, (temp + i + 1));
     if (result != 0)
     {
