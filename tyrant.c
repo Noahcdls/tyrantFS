@@ -277,6 +277,7 @@ int tfs_unlink(const char *path)
 
     // Update links count
     cur_node->links -= 1;
+    cur_node->change_time = get_current_time_in_nsec();
     node * tmp = NULL;
     // if links count is 0, remove the file/directory
     if (cur_node->links == 0)
