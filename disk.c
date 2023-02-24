@@ -5,6 +5,9 @@
 #include <string.h>
 #include "disk.h"
 #include <time.h>
+
+node * root_node = NULL;
+
 /*
 @brief mkfs for tyrant DEFAULT
 @param fs_space pointer to where beginning of memory space to write over
@@ -58,9 +61,8 @@ int tfs_mkfs(void *fs_space)
         bzero(inode_init, INODE_SIZE_BOUNDARY); // clear out inode info
     }
 
-    *(uint64_t *)fs_space = fs_space + END_OF_INODE * BLOCKSIZE;  // superblock holds first free block address
+    *(uint8_t **)fs_space = fs_space + END_OF_INODE * BLOCKSIZE;  // superblock holds first free block address
     uint8_t *free_blockptr = fs_space + END_OF_INODE * BLOCKSIZE; // shift pointer over to his free block
-    uint64_t block_counter = END_OF_INODE;
 
     uint64_t addr_counter = 0;
     while (addr_counter < NUM_FREE_BLOCKS)
@@ -78,22 +80,23 @@ int tfs_mkfs(void *fs_space)
         }
         free_blockptr = block_ptr - BLOCKSIZE; // go back and write the last address stored
     }
-    root = allocate_inode(fs_space);
-    root->mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH; // User, group, and other can only read
-    root->access_time = (uint32_t)time(NULL);
-    root->creation_time = (uint32_t)time(NULL);
+    root_node = allocate_inode(fs_space);
+    root_node->mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH; // User, group, and other can only read
+    root_node->access_time = (uint32_t)time(NULL);
+    root_node->creation_time = (uint32_t)time(NULL);
     uint8_t *block = allocate_block(fs_space);
-    root->direct_blocks[0] = block;
+    root_node->direct_blocks[0] = block;
     char path1[] = ".";
     char path2[] = "..";
     write_block(path1, block, 0, sizeof(path1)); // 56 bytes for directory name
-    write_block(&root, block, 56, sizeof(root)); // write root address
+    write_block(&root_node, block, 56, sizeof(root_node)); // write root_node address
 
     write_block(path2, block, 64, sizeof(path2));
-    write_block(&root, block, 64 * 2 - 8, sizeof(root)); // write root address
-    root->data_time = time(NULL);
-    root->size = NAME_BOUNDARY * 2;
-    root->blocks = 1;
+    write_block(&root_node, block, 64 * 2 - 8, sizeof(root_node)); // write root_node address
+    root_node->data_time = time(NULL);
+    root_node->size = NAME_BOUNDARY * 2;
+    root_node->blocks = 1;
+    root_node->links = 1;
     return 0;
 }
 
@@ -233,7 +236,7 @@ void *allocate_block(void *fs_space)
 {
     uint8_t *free_block = 0;
     // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
-    uint8_t *next_block = (*(uint64_t *)fs_space);
+    uint8_t *next_block = (*(uint8_t **)fs_space);
     if (next_block == NULL)
         return NULL;                                      // no more free blocks since next block is super block
     for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH) // 8 byte addresses for large storage drives (32bit )
@@ -241,7 +244,7 @@ void *allocate_block(void *fs_space)
         memcpy(&free_block, next_block, ADDR_LENGTH);
         if (free_block != 0)
         {
-            bzero(next_block, sizeof(uint8_t *)); // zero out available block
+            bzero(next_block, ADDR_LENGTH); // zero out available block
             if (i == BLOCKSIZE - ADDR_LENGTH)     // only 1 available address. Update super block
             {
                 memcpy(next_block, &free_block, ADDR_LENGTH); // Save address of next free list block
@@ -273,7 +276,7 @@ int free_block(void *fs_space, void *block)
         return -1;
     uint64_t free_block = 0;
     // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
-    uint8_t *next_block = (*(uint64_t *)fs_space); // ptrs are 8 bytes so get uint64_t value then convert as uint8 ptr
+    uint8_t *next_block = (*(uint8_t **)fs_space); // ptrs are 8 bytes so get uint64_t value then convert as uint8 ptr
     if (next_block == NULL)                        // Add as super block if there aren't any other free blocks
     {
         // *(uint64_t *)fs_space = block;
