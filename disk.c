@@ -12,11 +12,11 @@
 uint64_t root_node;
 
 int drive = -1; // field descriptor of drive we are working with
-static uint64_t drivesize = 0;
-static uint64_t inode_byte_boundary = 0;
-static uint64_t num_blocks = 0;
-static uint64_t inode_blocks = 0;
-static uint64_t data_blocks = 0;
+volatile uint64_t drivesize = 0;
+volatile uint64_t inode_byte_boundary = 0;
+volatile uint64_t num_blocks = 0;
+volatile uint64_t inode_blocks = 0;
+volatile uint64_t data_blocks = 0;
 
 /*
 @brief mkfs for tyrant with define options
@@ -30,39 +30,38 @@ int tfs_mkfs(int fd)
         return -1;
     drive = fd;
     // set up boundaries
-    uint8_t buff[BLOCK_SIZE];
-    bzero(buff, BLOCK_SIZE);
+    uint8_t buff[BLOCKSIZE];
+    bzero(buff, BLOCKSIZE);
     ioctl(fd, BLKGETSIZE64, &drivesize);
-    num_blocks = drivesize / BLOCK_SIZE;
-    inode_blocks = num_blocks / 65;//following ext4 standard of 1 inode for every 16KB of data or 1 inode block for every 64 data blocks
+    num_blocks = drivesize / BLOCKSIZE;
+    inode_blocks = num_blocks / 65; // following ext4 standard of 1 inode for every 16KB of data or 1 inode block for every 64 data blocks
     data_blocks = inode_blocks * 64;
-    inode_byte_boundary = (inode_blocks + 1) * BLOCK_SIZE;
+    inode_byte_boundary = (inode_blocks + 1) * BLOCKSIZE;
 
     lseek(fd, 0, SEEK_SET);
     for (uint64_t i = 0; i < inode_blocks + 1; i++) // clear out inodes and super block
-        write(fd, buff, BLOCK_SIZE);
+        write(fd, buff, BLOCKSIZE);
 
     lseek(fd, 0, SEEK_SET);
     write(fd, &inode_byte_boundary, ADDR_LENGTH); // superblock holds first free block address
 
-
     uint64_t addr_counter = 0;
     uint64_t block_ptr = 0;
-    uint64_t free_blockptr = inode_byte_boundary+addr_counter*BLOCK_SIZE;
+    uint64_t free_blockptr = inode_byte_boundary + addr_counter * BLOCKSIZE;
     while (addr_counter < data_blocks)
     {
-        lseek(fd, free_blockptr, SEEK_SET);//seek to beginning of block
-        write(fd, buff, BLOCK_SIZE);//clear out block
-        lseek(fd, -BLOCK_SIZE, SEEK_CUR);//go back to beginning
+        lseek(fd, free_blockptr, SEEK_SET); // seek to beginning of block
+        write(fd, buff, BLOCKSIZE);         // clear out block
+        lseek(fd, -BLOCKSIZE, SEEK_CUR);    // go back to beginning
 
-        block_ptr = inode_byte_boundary+addr_counter*BLOCK_SIZE+BLOCK_SIZE;//next free block
-        for (uint64_t i = 0; i < BLOCKSIZE; i += 8)//write one full block
+        block_ptr = inode_byte_boundary + addr_counter * BLOCKSIZE + BLOCKSIZE; // next free block
+        for (uint64_t i = 0; i < BLOCKSIZE; i += 8)                             // write one full block
         {
-            if (addr_counter >= NUM_FREE_BLOCKS)//break when we've hit our max
+            if (addr_counter >= NUM_FREE_BLOCKS) // break when we've hit our max
                 break;
-            write(fd, &block_ptr, BLOCK_SIZE);//automatically increments write ptr by 8bytes so need to shift
-            block_ptr += BLOCKSIZE;//add blocksize to offset where next block is
-            addr_counter++;//added 1 block to list
+            write(fd, &block_ptr, ADDR_LENGTH); // automatically increments write ptr by 8bytes so need to shift
+            block_ptr += BLOCKSIZE;           // add blocksize to offset where next block is
+            addr_counter++;                   // added 1 block to list
         }
         free_blockptr = block_ptr - BLOCKSIZE; // go back and write the last address stored
     }
@@ -101,11 +100,11 @@ uint64_t allocate_inode(int fd)
 {
     if (drive < 0)
         return 0;
-    lseek(drive, BLOCK_SIZE, SEEK_SET);
-    node* inode_ptr = malloc(sizeof(node));
+    lseek(drive, BLOCKSIZE, SEEK_SET);
+    node *inode_ptr = malloc(sizeof(node));
     for (int i = BLOCKSIZE; i < inode_byte_boundary; i += INODE_SIZE_BOUNDARY)
     {
-        read(drive, inode_ptr, INODE_SIZE_BOUNDARY);//read ptr automatically shifts us up to next inode
+        read(drive, inode_ptr, INODE_SIZE_BOUNDARY); // read ptr automatically shifts us up to next inode
         if (inode_ptr->mode == 0)
         { // cleared mode means not in use
             free(inode_ptr);
@@ -138,14 +137,16 @@ int free_inode(uint64_t inode)
 @param buff buffer we want to write inode information to
 @return 0 for proper return, -1 for error
 */
-int read_inode(void *inode, void *buff)
+int read_inode(uint64_t inode, void *buff)
 {
-    if (inode == NULL || buff == NULL)
+    if (inode == 0 || buff == NULL)
         return -1;
-    uint8_t *valid = memcpy(buff, inode, sizeof(node));
-    if (valid != NULL)
+    lseek(drive, inode, SEEK_SET);
+    ssize_t valid = read(drive, buff, INODE_SIZE_BOUNDARY);
+    // uint8_t *valid = memcpy(buff, inode, sizeof(node));
+    if (valid > 0)
         return 0;
-    return -1;
+    return 0;
 }
 
 /*
@@ -156,12 +157,13 @@ int read_inode(void *inode, void *buff)
 @note buff must contain a full inode.
 The easiest way to write and edit is to read a copy, make changes, and write back
 */
-int write_inode(void *inode, void *buff)
+int write_inode(uint64_t inode, void *buff)
 {
-    if (inode == NULL || buff == NULL)
+    if (inode == 0 || buff == NULL)
         return -1;
-    uint8_t *valid = memcpy(inode, buff, sizeof(node));
-    if (valid != NULL)
+    lseek(drive, inode, SEEK_SET);
+    ssize_t valid = write(drive, buff, INODE_SIZE_BOUNDARY);
+    if (valid > 0)
         return 0;
     return -1;
 }
@@ -186,13 +188,13 @@ uint32_t read_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
 
     if (bytes_avail < bytes)
     { // asking for more bytes than what is left so read what we can
-        return write(drive, buff, bytes_avail) > 0 ? bytes_avail : 0;
-        
+        ssize_t read_bytes = read(drive, buff, bytes_avail);
+        return read_bytes > 0 ? read_bytes : 0;
     }
     else
     { // can fill buffer with correct number of bytes
-        return write(drive, buff, bytes) > 0 ? bytes : 0;
-        
+        ssize_t read_bytes = read(drive, buff, bytes);
+        return read_bytes > 0 ? read_bytes : 0;
     }
     return 0;
 }
@@ -216,11 +218,13 @@ uint32_t write_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
     uint64_t bytes_avail = BLOCKSIZE - offset;
     if (bytes_avail < bytes)
     { // want to write more bytes than what is left in block
-        return write(drive, buff, bytes_avail);
+        ssize_t written = write(drive, buff, bytes_avail);
+        return written > 0 ? written : 0;
     }
     else
     { // write bytes to block
-        return write(drive, buff, bytes);
+        ssize_t written = write(drive, buff, bytes);
+        return written > 0 ? written : 0;
     }
     return 0;
 }
@@ -234,21 +238,21 @@ uint64_t allocate_block(int fd)
 {
     uint64_t free_block = 0;
     uint64_t next_block = 0;
-    uint8_t buff [ADDR_LENGTH];
-    bzero(buff, ADDR_LENGTH);//zero array
+    uint8_t buff[ADDR_LENGTH];
+    bzero(buff, ADDR_LENGTH); // zero array
 
     lseek(drive, 0, SEEK_SET);
-    read(drive, &next_block, ADDR_LENGTH);//get next block address
+    read(drive, &next_block, ADDR_LENGTH); // get next block address
     if (next_block == 0)
-        return 0;                                      // no more free blocks since next block is super block
+        return 0; // no more free blocks since next block is super block
 
     lseek(drive, next_block, SEEK_SET);
     for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH) // 8 byte addresses for large storage drives (32bit )
     {
-        read(drive, &free_block, ADDR_LENGTH);//read ptr automatically shifts up by 8 bytes
+        read(drive, &free_block, ADDR_LENGTH); // read ptr automatically shifts up by 8 bytes
         if (free_block != 0)
         {
-            lseek(drive, -ADDR_LENGTH, SEEK_CUR);  // zero out available block address
+            lseek(drive, -ADDR_LENGTH, SEEK_CUR); // zero out available block address
             write(drive, buff, ADDR_LENGTH);
 
             if (i == BLOCKSIZE - ADDR_LENGTH) // only 1 available address. Update super block
@@ -258,11 +262,11 @@ uint64_t allocate_block(int fd)
                 next_block = free_block;
                 // memcpy(next_block, &free_block, ADDR_LENGTH);//old code
 
-                lseek(drive, 0, SEEK_SET);// set free block as current block we are looking in
+                lseek(drive, 0, SEEK_SET); // set free block as current block we are looking in
                 read(drive, &free_block, ADDR_LENGTH);
                 // memcpy(&free_block, fs_space, ADDR_LENGTH);//old code
 
-                lseek(drive, 0, SEEK_SET);// Change super block to point to next free list block
+                lseek(drive, 0, SEEK_SET); // Change super block to point to next free list block
                 write(drive, &next_block, ADDR_LENGTH);
                 // memcpy(fs_space, next_block, ADDR_LENGTH);//old code
             }
@@ -275,7 +279,7 @@ uint64_t allocate_block(int fd)
     read(drive, &free_block, ADDR_LENGTH);
     lseek(drive, -ADDR_LENGTH, SEEK_CUR);
     write(drive, buff, ADDR_LENGTH);
-    return free_block;                          // we only get here if block is filled with zeros meaning it was the last free block
+    return free_block; // we only get here if block is filled with zeros meaning it was the last free block
 }
 
 /*
@@ -292,47 +296,47 @@ int free_block(int fd, uint64_t block)
     if (fd < 0 || block == 0)
         return -1;
     uint64_t free_block = 0;
-    uint8_t buff [BLOCK_SIZE];
-    bzero(buff, BLOCK_SIZE);
+    uint8_t buff[BLOCKSIZE];
+    bzero(buff, BLOCKSIZE);
     // uint8_t *next_block = fs_space + *(uint64_t *)fs_space * BLOCKSIZE; // go to the block containing free address blocks
     lseek(drive, 0, SEEK_SET);
     uint64_t next_block = 0;
-    read(drive, &next_block, ADDR_LENGTH);//get block to add address to
+    read(drive, &next_block, ADDR_LENGTH); // get block to add address to
 
-    if (next_block == 0)                        // Add as super block if there aren't any other free blocks
+    if (next_block == 0) // Add as super block if there aren't any other free blocks
     {
         // *(uint64_t *)fs_space = block;
-        lseek(drive, 0, SEEK_SET);//go back to beginning
-        write(drive, &block, ADDR_LENGTH);//write back new address
-        lseek(drive, block, SEEK_SET); // clear block
-        write(drive, buff, BLOCK_SIZE);
-        return 0;                // success
+        lseek(drive, 0, SEEK_SET);         // go back to beginning
+        write(drive, &block, ADDR_LENGTH); // write back new address
+        lseek(drive, block, SEEK_SET);     // clear block
+        write(drive, buff, BLOCKSIZE);
+        return 0; // success
     }
 
-    lseek(drive, next_block, SEEK_SET);//go to block containing addresses    
+    lseek(drive, next_block, SEEK_SET); // go to block containing addresses
     for (uint64_t i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
     {
-        read(drive, &free_block, ADDR_LENGTH);//read address. read ptr automatically moves 8 bytes
-        if (free_block == 0) // a free spot to write in a new block
+        read(drive, &free_block, ADDR_LENGTH); // read address. read ptr automatically moves 8 bytes
+        if (free_block == 0)                   // a free spot to write in a new block
         {
             // *(uint64_t *)next_block = block; // write in block to free space
-            lseek(drive, -ADDR_LENGTH, SEEK_CUR);//go back 8 bytes to go back where we just read
-            write(drive, &block, ADDR_LENGTH);//write in addr
-            if (i == BLOCKSIZE - ADDR_LENGTH) // first address at end
+            lseek(drive, -ADDR_LENGTH, SEEK_CUR); // go back 8 bytes to go back where we just read
+            write(drive, &block, ADDR_LENGTH);    // write in addr
+            if (i == BLOCKSIZE - ADDR_LENGTH)     // first address at end
             {
                 lseek(drive, block, SEEK_SET);
-                write(drive, buff, BLOCK_SIZE); // zero if we are set up to jump here
+                write(drive, buff, BLOCKSIZE); // zero if we are set up to jump here
             }
             return 0;
         }
         next_block = next_block + ADDR_LENGTH; // advance 8 bytes
     }
-    next_block -= BLOCK_SIZE;
+    next_block -= BLOCKSIZE;
     // if the whole block is full, make block next super block with link to the full one
     seek(drive, block, SEEK_SET);
-    write(drive, buff, BLOCK_SIZE);//wipe block    
+    write(drive, buff, BLOCKSIZE); // wipe block
     // *(uint64_t *)(block+BLOCKSIZE-8) = *(uint64_t *)fs_space; //last address in freed block is current superblock that's full
-    lseek(drive, block + BLOCK_SIZE - ADDR_LENGTH, SEEK_SET);
+    lseek(drive, block + BLOCKSIZE - ADDR_LENGTH, SEEK_SET);
     write(drive, &next_block, ADDR_LENGTH);
     // memcpy(block + BLOCKSIZE - ADDR_LENGTH, fs_space, ADDR_LENGTH);
 
@@ -347,57 +351,79 @@ int free_block(int fd, uint64_t block)
 /// @param my_node inode of interest
 /// @param block_no the block number ranging from 0 to my_node->blocks - 1
 /// @return return block pointer or NULL
-void *fetch_block(void *my_node, uint64_t block_no)
+void *fetch_block(uint64_t my_node, uint64_t block_no, void *block)
 {
-    if (my_node == NULL)
+    uint64_t block_addr = 0;
+    if (my_node == 0)
         return NULL;
-    node *parent = my_node;
-    uint8_t *block = NULL;
+
+    node *parent = malloc(sizeof(node));
+    fetch_inode(my_node, parent);
+
     if (parent->blocks <= block_no)
     { // only accept block_no from 0 to blocks-1
+        free(parent);
         return NULL;
     }
 
     if (block_no < 12)
     {
-        return parent->direct_blocks[block_no];
+        read_block(block, parent->direct_blocks[block_no], 0, BLOCKSIZE);
+        free(parent);
+        return block;
     }
     else if (block_no < 12 + BLOCKSIZE / ADDR_LENGTH)
     {
-        read_block(&block, parent->indirect_blocks, (block_no - 12) * ADDR_LENGTH, ADDR_LENGTH);
+        read_block(&block_addr, parent->indirect_blocks, (block_no - 12) * ADDR_LENGTH, ADDR_LENGTH);
+        if (block_addr == 0)
+        {
+            free(parent);
+            return NULL;
+        }
+        read_block(block, block_addr, 0, BLOCKSIZE);
+        free(parent);
         return block;
     }
     else if (block_no < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2))
     {
-        uint8_t *indir_blk = NULL;
+        uint64_t indir_blk = 0;
         uint64_t dbl_offset = block_no - 12 - BLOCKSIZE / ADDR_LENGTH;
         for (uint64_t i = 0; i < pow(BLOCKSIZE / ADDR_LENGTH, 2); i += BLOCKSIZE / ADDR_LENGTH)
         {
             if (dbl_offset < i)
             {
-                read_block(&indir_blk, parent->dbl_indirect, (i / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
-                if (indir_blk == 0)
+                uint32_t valid_bytes = read_block(&indir_blk, parent->dbl_indirect, (i / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH); // get block addr from dbl indir
+                if (indir_blk == 0 || valid_bytes == 0)
                 {
+                    free(parent);
                     return NULL;
                 }
                 dbl_offset = dbl_offset - (i - BLOCKSIZE / ADDR_LENGTH);
-                read_block(&block, indir_blk, dbl_offset * ADDR_LENGTH, ADDR_LENGTH);
+                read_block(&block_addr, indir_blk, dbl_offset * ADDR_LENGTH, ADDR_LENGTH);
+                if (block_addr == 0)
+                {
+                    free(parent);
+                    return NULL;
+                }
+                read_block(block, block_addr, 0, BLOCKSIZE);
+                free(parent);
                 return block;
             }
         }
     }
     else if (block_no < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2) + pow(BLOCKSIZE / ADDR_LENGTH, 3))
     {
-        uint8_t *dbl_blk = NULL;
-        uint8_t *indir_blk = NULL;
+        uint64_t dbl_blk = 0;
+        uint64_t indir_blk = 0;
         uint64_t trpl_offset = block_no - (12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2));
         for (uint64_t i = 0; i < pow(BLOCKSIZE / ADDR_LENGTH, 3); i += pow(BLOCKSIZE / ADDR_LENGTH, 2))
         {
             if (trpl_offset < i)
             {
-                read_block(&dbl_blk, parent->trpl_indirect, ((i / (pow(BLOCKSIZE / ADDR_LENGTH, 2))) - 1) * ADDR_LENGTH, ADDR_LENGTH);
+                read_block(&dbl_blk, parent->trpl_indirect, ((i / (pow(BLOCKSIZE / ADDR_LENGTH, 2))) - 1) * ADDR_LENGTH, ADDR_LENGTH); // get dbl indir blk address we want
                 if (dbl_blk == 0)
                 {
+                    free(parent);
                     return NULL;
                 }
                 trpl_offset = trpl_offset - (i - pow(BLOCKSIZE / ADDR_LENGTH, 2));
@@ -406,10 +432,19 @@ void *fetch_block(void *my_node, uint64_t block_no)
                     if (trpl_offset < j)
                     {
                         read_block(&indir_blk, dbl_blk, (j / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
-                        if (indir_blk == NULL)
+                        if (indir_blk == 0)
+                        {
+                            free(parent);
                             return NULL;
+                        }
                         trpl_offset = trpl_offset - (j - BLOCKSIZE / ADDR_LENGTH);
-                        read_block(&block, indir_blk, trpl_offset * ADDR_LENGTH, ADDR_LENGTH);
+                        read_block(&block_addr, indir_blk, trpl_offset * ADDR_LENGTH, ADDR_LENGTH);
+                        if (block_addr == 0)
+                        {
+                            free(parent);
+                            return NULL;
+                        }
+                        read_block(block, block_addr, 0, BLOCKSIZE);
                         return block;
                     }
                 }
@@ -419,7 +454,21 @@ void *fetch_block(void *my_node, uint64_t block_no)
     return NULL;
 }
 
-int commit_inode(node* my_node, uint64_t node_loc){
+/// @brief fetch the inode we want into a buffer
+/// @param node offset to where node is located
+/// @param buff buffer to place inode
+/// @return returns buff
+void *fetch_inode(uint64_t node, void *buff)
+{
+    if (node == 0)
+        return;
+    lseek(drive, node, SEEK_SET);
+    read(drive, node, INODE_SIZE_BOUNDARY);
+    return buff;
+}
+
+int commit_inode(node *my_node, uint64_t node_loc)
+{
     lseek(drive, node_loc, SEEK_SET);
     return write(drive, my_node, INODE_SIZE_BOUNDARY) > 0 ? 0 : -1;
 }

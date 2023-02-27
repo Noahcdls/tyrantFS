@@ -18,6 +18,7 @@
         "time_t.h": "c",
         "stdlib.h": "c",
         "statvfs.h": "c",
-        "statfs.h": "c"
+        "statfs.h": "c",
+        "mount.h": "c"
     }
 }

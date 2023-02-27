@@ -50,6 +50,11 @@ typedef struct inode node;
 
 // extern node * root_node;
 extern uint64_t root_node;//offset to root
+extern uint64_t drivesize;
+extern uint64_t num_blocks;
+extern uint64_t inode_blocks;
+extern uint64_t data_blocks;
+extern int drive;
 #define NAME_BOUNDARY 64
 
 
@@ -62,4 +67,5 @@ uint32_t read_block(void *buff, uint64_t block, off_t offset, uint64_t bytes);
 uint32_t write_block(void *buff, uint64_t block, off_t offset, uint64_t bytes);
 uint64_t allocate_block(int fd);
 int free_block(int fd, uint64_t block);
-uint64_t fetch_block(uint64_t my_node, uint64_t block_no);
+void * fetch_block(uint64_t my_node, uint64_t block_no, void * block);
+void * fetch_inode(uint64_t node, void* buff);

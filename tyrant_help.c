@@ -1,14 +1,16 @@
 #include "tyrant_help.h"
 
-void *add_block_to_node(void *fs_space, node *parent)
+void *add_block_to_node(node *parent)
 {
-    if (parent == NULL){
+    if (parent == NULL)
+    {
         printf("NULL PARENT\n\n");
         return NULL;
     }
     uint8_t *block = allocate_block(fs_space);
-    if (block == NULL){
-        printf("NO MORE BLOCKS: ADD BLOCK TO NODE\n\n");//
+    if (block == NULL)
+    {
+        printf("NO MORE BLOCKS: ADD BLOCK TO NODE\n\n"); //
         return NULL;
     }
     if (parent->blocks == UINT64_MAX)
@@ -133,7 +135,7 @@ void *add_block_to_node(void *fs_space, node *parent)
 /// @param parent_node parent node
 /// @param cur_node child node
 /// @return 0 on success; -1 on failure
-int remove_link_from_parent(void * fs_space, node *parent_node, node *cur_node)
+int remove_link_from_parent(void *fs_space, node *parent_node, node *cur_node)
 {
     node *child = NULL;
     uint8_t *block = NULL;
@@ -149,17 +151,18 @@ int remove_link_from_parent(void * fs_space, node *parent_node, node *cur_node)
             read_block(&child, block, j + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH);
             if (child == cur_node)
             {
-                bzero(block + j, NAME_BOUNDARY); // remove old entry
-                uint8_t *last_block = get_i_block(parent_node, parent_node->blocks - 1); //get last block for last entry
-                if(last_block == NULL)
+                bzero(block + j, NAME_BOUNDARY);                                         // remove old entry
+                uint8_t *last_block = get_i_block(parent_node, parent_node->blocks - 1); // get last block for last entry
+                if (last_block == NULL)
                     return -1;
                 if (j + i * BLOCKSIZE != parent_node->size - NAME_BOUNDARY)
-                { // not the last slot so we need to refill the space
+                {                                                                                                     // not the last slot so we need to refill the space
                     read_block(entry_data, last_block, parent_node->size % BLOCKSIZE - NAME_BOUNDARY, NAME_BOUNDARY); // copy data over into buffer
                     write_block(entry_data, block, j, ADDR_LENGTH);                                                   // fill in empty slot
                 }
                 parent_node->size -= NAME_BOUNDARY;
-                if(parent_node->size%BLOCKSIZE == 0){//have cleared an entire block and need to deallocate
+                if (parent_node->size % BLOCKSIZE == 0)
+                { // have cleared an entire block and need to deallocate
                     free_block(fs_space, last_block);
                     parent_node->blocks--;
                 }
@@ -323,10 +326,10 @@ int add_addr(node *parent, uint8_t *block, node *addr, char *name)
     strcpy(temp, name);
     for (int i = 0; i < BLOCKSIZE; i += NAME_BOUNDARY)
     {
-        if (*(block + i) == 0)                                                               // nothing written here
-        {                                                                                    // no name so can write over
-            write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH);            // write name
-            printf("Writing address %p at location %p\n", addr, block+i+NAME_BOUNDARY-ADDR_LENGTH);
+        if (*(block + i) == 0)                                        // nothing written here
+        {                                                             // no name so can write over
+            write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH); // write name
+            printf("Writing address %p at location %p\n", addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
             write_block(&addr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
             printf("%p added as address\n", addr);
             parent->size += NAME_BOUNDARY;
@@ -347,107 +350,19 @@ int add_to_directory(void *fs_space, node *parent, node *child, char *name)
 {
     if (parent == NULL || child == NULL)
         return -1;
-    uint8_t * block = NULL;
-    if (parent->size%BLOCKSIZE == 0)//only full blocks
-    { //we have filled up a block and need a new one
+    uint8_t *block = NULL;
+    if (parent->size % BLOCKSIZE == 0) // only full blocks
+    {                                  // we have filled up a block and need a new one
         block = add_block_to_node(fs_space, parent);
         if (block == NULL)
             return -1;
         bzero(block, BLOCKSIZE); // clean for directory
         return add_addr(parent, block, child, name);
     }
-    block = get_i_block(parent, parent->blocks-1);
+    block = get_i_block(parent, parent->blocks - 1);
     return add_addr(parent, block, child, name);
 
     return 0;
-
-    // uint64_t num_blocks = parent->blocks;
-    // if (num_blocks == 0) // an inode should at least have 1 block allocated
-    //     return -1;
-    // if (num_blocks <= 12) // direct
-    // {
-    //     int result = add_addr(parent->direct_blocks[parent->blocks - 1], child, name);
-    //     if (result == -1) // block is full
-    //     {
-    //         uint8_t *blk_result = add_block_to_node(fs_space, parent);
-    //         if (blk_result == NULL)
-    //             return -1;
-    //         result = add_addr(blk_result, child, name);
-    //     }
-    //     parent->size += result < 0 ? 0 : NAME_BOUNDARY;
-    //     return result;
-    // }
-    // else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH) // indirect
-    // {
-    //     uint64_t loc = parent->blocks - 12;
-    //     uint8_t *blk_from_indir = NULL;
-    //     read_block(&blk_from_indir, parent->indirect_blocks, (parent->blocks - 12 - 1) * ADDR_LENGTH, ADDR_LENGTH);
-    //     if (blk_from_indir == 0)
-    //         blk_from_indir = add_block_to_node(fs_space, parent);
-    //     int result = add_addr(blk_from_indir, child, name);
-    //     if (result == -1) // block is full
-    //     {
-    //         uint8_t *blk_result = add_block_to_node(fs_space, parent);
-    //         if (blk_result == NULL) // no more blocks to add to parent
-    //             return -1;
-    //         result = add_addr(blk_result, child, name);
-    //     }
-    //     parent->size += result < 0 ? 0 : NAME_BOUNDARY;
-    //     return result;
-    // }
-    // else if (num_blocks <= 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2)) // double indirect
-    // {
-    //     uint64_t base = 12 + BLOCKSIZE / ADDR_LENGTH;
-    //     for (uint64_t i = 0; i <= pow(BLOCKSIZE / ADDR_LENGTH, 2); i += BLOCKSIZE / ADDR_LENGTH)
-    //     {
-    //         if (parent->blocks <= base + i)
-    //         {
-    //             uint8_t *indir_blk = NULL;
-    //             read_block(&indir_blk, parent->dbl_indirect, (i / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
-    //             uint64_t loc = parent->blocks - (base + i - BLOCKSIZE / ADDR_LENGTH) - 1;
-    //             uint8_t *blk_result = NULL;
-    //             read_block(&blk_result, indir_blk, loc * ADDR_LENGTH, ADDR_LENGTH);
-    //             int result = add_addr(blk_result, child, name);
-    //             if (result == -1)
-    //             {
-    //                 blk_result = add_block_to_node(fs_space, parent);
-    //                 result = add_addr(blk_result, child, name);
-    //             }
-    //             parent->size += result < 0 ? 0 : NAME_BOUNDARY;
-    //             return result;
-    //         }
-    //     }
-    // }
-    // else // triple indirect
-    // {
-    //     uint64_t base = 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2);
-    //     for (uint64_t i = 0; i <= pow(BLOCKSIZE / ADDR_LENGTH, 3); i += pow(BLOCKSIZE / ADDR_LENGTH, 2))
-    //     {
-    //         if (parent->blocks <= base + i)
-    //         {
-    //             for (uint64_t j = 0; j < pow(BLOCKSIZE / ADDR_LENGTH, 2); j += BLOCKSIZE / ADDR_LENGTH)
-    //             {
-    //                 if (parent->blocks <= base + i + j - pow(BLOCKSIZE / ADDR_LENGTH, 2))
-    //                 {
-    //                     uint8_t *dbl_dir, *indir_blk, *blk_result;
-    //                     read_block(&dbl_dir, parent->trpl_indirect, (i / (pow(BLOCKSIZE / ADDR_LENGTH, 2)) - 1) * ADDR_LENGTH, ADDR_LENGTH);
-    //                     read_block(&indir_blk, dbl_dir, (j / (BLOCKSIZE / ADDR_LENGTH) - 1) * ADDR_LENGTH, ADDR_LENGTH);
-    //                     uint64_t loc = parent->blocks - (base + i + j - pow(BLOCKSIZE / ADDR_LENGTH, 2) - BLOCKSIZE / ADDR_LENGTH) - 1;
-    //                     read_block(&blk_result, indir_blk, loc, ADDR_LENGTH);
-    //                     int result = add_addr(blk_result, child, name);
-    //                     if (result == -1)
-    //                     {
-    //                         blk_result = add_block_to_node(fs_space, parent);
-    //                         result = add_addr(blk_result, child, name);
-    //                     }
-    //                     parent->size += result < 0 ? 0 : NAME_BOUNDARY;
-    //                     return result;
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-    // return -1;
 }
 
 /*
@@ -457,7 +372,7 @@ and return address
 @param name name of directory or file
 @return inode ptr to
 */
-void *check_block(uint8_t *block, char *name)
+uint64_t check_block(uint8_t *block, char *name)
 {
     printf("Searching for %s\n", name);
     if (block == NULL)
@@ -469,14 +384,14 @@ void *check_block(uint8_t *block, char *name)
         // printf("%s is %d\n", tmp_name, strcmp(tmp_name, name));
         if (strcmp(tmp_name, name) == 0) // found a match in the name
         {
-            node *node_ptr = NULL;
-            printf("Reading address at location %p\n", block+i+NAME_BOUNDARY-ADDR_LENGTH);
+            uint64_t node_ptr = NULL;
+            printf("Reading address at location %p\n", block + i + NAME_BOUNDARY - ADDR_LENGTH);
             read_block(&node_ptr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
             printf("Return with address %p\n", node_ptr);
             return node_ptr;
         }
     }
-    return NULL;
+    return 0;
 }
 
 /*
@@ -486,23 +401,31 @@ void *check_block(uint8_t *block, char *name)
 @param block_count number of blocks left to check based on original node we are checking
 @return inode ptr to
 */
-void *check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
+uint64_t check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
     if (block == NULL)
-        return NULL;
-    node *tmp_node = NULL;
+        return 0;
+    uint64_t tmp_node = 0;
+    uint8_t * data_block = malloc(BLOCKSIZE);
     for (int i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
     {
-        if (*block_count == 0)
-            return NULL;
+        if (*block_count == 0){
+            free(data_block);
+            return 0;
+        }
         *block_count = *block_count - 1;
-        uint8_t *block_addr;
+        uint64_t block_addr;
         memcpy(&block_addr, block + i, ADDR_LENGTH); // write address
-        tmp_node = check_block(block_addr, name);
-        if (tmp_node != NULL)
+        lseek(drive, block_addr, SEEK_SET);
+        read(drive, data_block, BLOCKSIZE);
+        tmp_node = check_block(data_block, name);
+        if (tmp_node != 0){
+            free(data_block);
             return tmp_node;
+        }
     }
-    return NULL;
+    free(data_block);
+    return 0;
 }
 
 /*
@@ -512,21 +435,29 @@ void *check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 @param block_count number of blocks left to check based on original node we are checking
 @return inode ptr to
 */
-void *check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
+uint64_t check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
     if (block == NULL)
-        return NULL;
-    node *tmp_node = NULL;
+        return 0;
+    uint64_t tmp_node = 0;
+    uint8_t * data_block = malloc(BLOCKSIZE);
     for (int i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
     {
-        if (*block_count == 0)
-            return NULL;
-        uint8_t *block_addr;
+        if (*block_count == 0){
+            free(data_block);
+            return 0;
+        }
+        uint64_t block_addr;
         memcpy(&block_addr, block + i, ADDR_LENGTH);
-        tmp_node = check_dbl_indirect_blk(block_addr, name, block_count);
-        if (tmp_node != NULL)
+        lseek(drive, block_addr, SEEK_SET);
+        read(drive, data_block, BLOCKSIZE);
+        tmp_node = check_indirect_blk(data_block, name, block_count);
+        if (tmp_node != 0){
+            free(data_block);
             return tmp_node;
+        }
     }
+    free(data_block);
     return NULL;
 }
 
@@ -537,22 +468,30 @@ void *check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 @param block_count number of blocks left to check based on original node we are checking
 @return inode ptr to
 */
-void *check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
+uint64_t check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
     if (block == NULL)
-        return NULL;
-    node *tmp_node = NULL;
+        return 0;
+    uint64_t tmp_node = 0;
+    uint8_t * data_block = malloc(BLOCKSIZE);
     for (int i = 0; i < BLOCKSIZE; i += ADDR_LENGTH)
     {
-        if (*block_count == 0)
-            return NULL;
-        uint8_t *block_addr;
+        if (*block_count == 0){
+            free(data_block);
+            return 0;
+        }
+        uint64_t block_addr;
         memcpy(&block_addr, block + i, ADDR_LENGTH);
-        tmp_node = check_dbl_indirect_blk(block_addr, name, block_count);
-        if (tmp_node != NULL)
+        lseek(drive, block_addr, SEEK_SET);
+        read(drive, data_block, BLOCKSIZE);
+        tmp_node = check_dbl_indirect_blk(data_block, name, block_count);
+        if (tmp_node != 0){
+            free(data_block);
             return tmp_node;
+        }
     }
-    return NULL;
+    free(data_block);
+    return 0;
 }
 
 /*
@@ -562,12 +501,14 @@ void *check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 void *find_path_node(char *path)
 {
     char cpy_path[NAME_BOUNDARY], *node_name;
-    node *cur_node = root_node;
-    if(root_node == NULL){
+
+    if (root_node == 0)
+    {
         printf("NULL ROOT\n");
         return NULL;
     }
-
+    node *cur_node = malloc(sizeof(node));
+    fetch_inode(root_node, cur_node);
     strcpy(cpy_path, path);
     node_name = strtok(cpy_path, "/");
 
@@ -577,10 +518,16 @@ void *find_path_node(char *path)
         uint64_t block_cnt = cur_node->blocks; // check how many blocks inode uses to limit blocks checked
         for (int i = 0; i < 12; i++)
         {
-            if (block_cnt == 0) // no more blocks means you didnt find out
+            if (block_cnt == 0)
+            { // no more blocks means you didnt find out
+                free(cur_node);
                 return NULL;
-            if (cur_node->direct_blocks[i] == NULL) // bad case
+            }
+            if (cur_node->direct_blocks[i] == NULL)
+            { // bad case
+                free(cur_node);
                 return NULL;
+            }
             tmp_node = check_block(cur_node->direct_blocks[i], node_name); // check block for addresses
             block_cnt--;
             if (tmp_node != NULL) // found the next inode
