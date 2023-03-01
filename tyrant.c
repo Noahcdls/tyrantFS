@@ -209,7 +209,79 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
     return -1;
 }
 
-/// @brief Removes a file or a directory
+/// @brief Removes a directory
+/// @param pathname directory path
+/// @return 0 success, -1 failure
+int tfs_rmdir(const char *path)
+{
+    // first check if the pathname is valid
+    node *cur_node = find_path_node((char*)path);
+    if (cur_node == NULL)
+    {
+        return -1;
+    }
+
+    // cannot remove root
+    if (strcmp(path, "/") == 0)
+    { // if root, return -1 (operation not permitted)
+        return -1;
+    }
+
+    /////////////////////// start parent search
+    node *parent_node = NULL;
+    char *temp = malloc(sizeof(char) * (strlen(path) + 1));
+
+    int i;
+    strcpy(temp, path);
+    for (i = strlen(path) - 1; temp[i] != '/' && i >= 0; i--)
+        ; // check for last / to differentiate parent path from new directory
+    if (i == -1)
+    {
+        free(temp);
+        return -1; // invalid path
+    }
+
+    temp[i] = 0; // terminate at / for full path
+
+    if (i != 0) // '/' or root is the first byte
+        parent_node = find_path_node(temp);
+    else
+        parent_node = root_node;
+    if (parent_node == NULL)
+    {
+        free(temp);
+        return -1;
+    }
+
+    ///////////////////////////////////////PARENT SEARCH END
+
+    // remove link from its parent
+    int status = remove_link_from_parent(memspace, parent_node, cur_node);
+    if (status == -1)
+    {
+        // something is wrong, as we cannot find child from parent
+        return -1;
+    }
+
+    // Update links count
+    cur_node->links -= 1;
+    node * tmp = NULL;
+    // if links count is 0, remove the file/directory
+    if (cur_node->links == 0)
+    {
+        for (int i = 0; i < cur_node->blocks; i++)
+        {
+            uint8_t *block = get_i_block(cur_node, i);
+            // put the whole block back to free list
+            free_block(memspace, block);
+        }
+        // free the inode
+        free_inode(cur_node);
+    }
+    return 0;
+}
+
+/// @brief Removes a file
 /// @param pathname file path
 /// @return 0 success, -1 failure
 int tfs_unlink(const char *path)
