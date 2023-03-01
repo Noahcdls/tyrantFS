@@ -69,3 +69,4 @@ uint64_t allocate_block(int fd);
 int free_block(int fd, uint64_t block);
 void * fetch_block(uint64_t my_node, uint64_t block_no, void * block);
 void * fetch_inode(uint64_t node, void* buff);
+int commit_inode(node *my_node, uint64_t node_loc);

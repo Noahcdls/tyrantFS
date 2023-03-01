@@ -20,7 +20,8 @@ uint8_t *memspace = NULL;
 int tfs_mkdir(const char *path, mode_t m)
 {
     printf("CALLING MKDIR with path %s\n\n", path);
-    node *parent_node = NULL;
+    node parent_node;
+    uint64_t parent = 0;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1));
 
     int i;
@@ -36,50 +37,56 @@ int tfs_mkdir(const char *path, mode_t m)
     temp[i] = 0; // terminate at / for full path
 
     if (i != 0) // '/' or root is the first byte
-        parent_node = find_path_node(temp);
+        parent = find_path_node(temp);
     else
-        parent_node = root_node;
-    if (parent_node == NULL)
+        parent = root_node;
+    if (parent == 0)
     {
         free(temp);
         return -1;
     }
-
+    fetch_inode(parent, &parent_node);
     ///////////////////////////////////////PARENT SEARCH END
 
-    node *dir_node = allocate_inode(memspace); // get inode
-    if (dir_node == NULL)
+    uint64_t dir = allocate_inode(drive); // get inode
+    node dir_node;
+    if (dir == 0)
     {
         free(temp);
         return -1;
     }
-    uint8_t *block = allocate_block(memspace); // get block
-    if (block == NULL)
+    fetch_inode(dir, &dir_node);
+
+    uint64_t block = allocate_block(drive); // get block
+    if (block == 0)
     {
-        free_inode(dir_node); // free node if we cant make a full directory
+        free_inode(dir); // free node if we cant make a full directory
         free(temp);
         return -1;
     }
-    bzero(block, BLOCKSIZE);
+    uint8_t block_data [BLOCKSIZE];
+    bzero(block_data, BLOCKSIZE);
+    write_block(block_data, block, 0, BLOCKSIZE);//clear directory block
     // https://jameshfisher.com/2017/02/24/what-is-mode_t/
     // what mode_t means
-    dir_node->creation_time = time(NULL);
-    dir_node->mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
-    dir_node->mode |= S_IFDIR;
-    dir_node->direct_blocks[0] = block;
-    dir_node->blocks = 1;
-    dir_node->links = 1;
+    dir_node.creation_time = time(NULL);
+    dir_node.mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
+    dir_node.mode |= S_IFDIR;
+    dir_node.direct_blocks[0] = block;
+    dir_node.blocks = 1;
+    dir_node.links = 1;
     write_block(".", block, 0, sizeof("."));
-    write_block(&dir_node, block, MAX_NAME_LENGTH, sizeof(dir_node));
+    write_block(&dir, block, MAX_NAME_LENGTH, ADDR_LENGTH);
 
     write_block("..", block, PATH_BOUNDARY, sizeof(".."));
-    write_block(&parent_node, block, 2 * PATH_BOUNDARY - sizeof(uint8_t *), sizeof(parent_node)); // write address of parent node
-    dir_node->size = PATH_BOUNDARY * 2;
-    int result = add_to_directory(memspace, parent_node, dir_node, (temp + i + 1));
+    write_block(&parent, block, 2 * PATH_BOUNDARY - BLOCKSIZE, ADDR_LENGTH); // write address of parent node
+    dir_node.size = PATH_BOUNDARY * 2;
+    commit_inode(&dir_node, dir);
+    int result = add_to_directory(parent, dir, (temp + i + 1));
     if (result != 0)
     {
-        free_block(memspace, block); // need memspace since we need to write on disk/working memory too
-        free_inode(dir_node);
+        free_block(drive, block); // need memspace since we need to write on disk/working memory too
+        free_inode(dir);
         free(temp);
         return -1;
     }
@@ -90,7 +97,8 @@ int tfs_mkdir(const char *path, mode_t m)
 
 int tfs_mknod(const char *path, mode_t m, dev_t d)
 {
-    node *parent_node = NULL;
+    uint64_t parent = 0;
+    node parent_node;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1)); // for us to hold path
 
     int i;
@@ -106,10 +114,10 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     temp[i] = 0; // terminate at / for full path
 
     if (i != 0) // '/' or root is the first byte
-        parent_node = find_path_node(temp);
+        parent = find_path_node(temp);
     else
-        parent_node = root_node;
-    if (parent_node == NULL)
+        parent = root_node;
+    if (parent == 0)
     {
         free(temp);
         return -1;
@@ -117,24 +125,27 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
 
     ///////////////////////////////////////PARENT SEARCH END
 
-    node *data_node = allocate_inode(memspace); // get inode
-    if (data_node == NULL)
+    uint64_t data = allocate_inode(drive); // get inode
+    if (data == 0)
     {
         free(temp);
         return -1;
     }
+    node data_node;
+    fetch_inode(data, &data_node);
     // https://jameshfisher.com/2017/02/24/what-is-mode_t/
     // what mode_t means
     // dev_t is device ID
-    data_node->mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
-    data_node->links = 1;
-    data_node->blocks = 0;
-    data_node->size = 0;
-    data_node->creation_time = time(NULL);
-    int result = add_to_directory(memspace, parent_node, data_node, (temp + i + 1));
+    data_node.mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
+    data_node.links = 1;
+    data_node.blocks = 0;
+    data_node.size = 0;
+    data_node.creation_time = time(NULL);
+    commit_inode(&data_node, data);
+    int result = add_to_directory(parent, data, (temp + i + 1));
     if (result != 0)
     {
-        free_inode(data_node);
+        free_inode(data);
         free(temp);
         return result;
     }
@@ -153,19 +164,21 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
 int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
 
-    node *dir = find_path_node((char *)path);
-    if (dir == NULL)
+    uint64_t dir_loc = find_path_node((char *)path);
+    if (dir_loc == 0)
         return -1;
-    uint8_t *block = NULL;
+    node dir;
+    fetch_inode(dir_loc, &dir);
+    uint64_t block = 0;
     uint64_t block_count = 0;
     uint64_t byte_count = 0;
-    uint64_t total_blocks = dir->blocks;
-    uint64_t total_bytes = dir->size;
+    uint64_t total_blocks = dir.blocks;
+    uint64_t total_bytes = dir.size;
     char name[MAX_NAME_LENGTH];
     while (block_count < total_blocks && byte_count < total_bytes)
     {
-        block = get_i_block(dir, block_count);
-        if (block == NULL)
+        block = get_i_block(dir_loc, block_count);
+        if (block == 0)
         {
             block++;
             byte_count += BLOCKSIZE;
@@ -186,9 +199,11 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
 
 int tfs_open(const char *path, struct fuse_file_info *fi)
 {
-    node *cur_node = find_path_node((char*)path);
-    if (cur_node == NULL)
+    uint64_t cur = find_path_node((char*)path);
+    if (cur == 0)
         return -1;
+    node cur_node;
+    fetch_inode(cur, &cur_node);
     uint32_t flags = 0;
     switch (fi->flags & O_ACCMODE)
     {
@@ -202,7 +217,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
         flags = flags | 0222;
         break;
     }
-    if (flags & cur_node->mode)
+    if (flags & cur_node.mode)
     {
         // fi->fh = &cur_node; // fh is a uint64_t that can be used to store data during open or release
         // fh gets called when reading and writing so very useful to store inode address here
@@ -217,11 +232,13 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
 int tfs_unlink(const char *path)
 {
     // first check if the pathname is valid
-    node *cur_node = find_path_node((char*)path);
-    if (cur_node == NULL)
+    uint64_t cur = find_path_node((char*)path);
+    if (cur == 0)
     {
         return -1;
     }
+    node cur_node;
+    fetch_inode(cur, &cur_node);
 
     // cannot remove root
     if (strcmp(path, "/") == 0)
@@ -230,7 +247,7 @@ int tfs_unlink(const char *path)
     }
 
     /////////////////////// start parent search
-    node *parent_node = NULL;
+    uint64_t parent = 0;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1));
 
     int i;
@@ -246,46 +263,50 @@ int tfs_unlink(const char *path)
     temp[i] = 0; // terminate at / for full path
 
     if (i != 0) // '/' or root is the first byte
-        parent_node = find_path_node(temp);
+        parent = find_path_node(temp);
     else
-        parent_node = root_node;
-    if (parent_node == NULL)
+        parent = root_node;
+    if (parent == NULL)
     {
         free(temp);
         return -1;
     }
+    node parent_node;
+    
 
     ///////////////////////////////////////PARENT SEARCH END
 
     // remove link from its parent
-    int status = remove_link_from_parent(memspace, parent_node, cur_node);
+    int status = remove_link_from_parent(parent, cur);
     if (status == -1)
     {
         // something is wrong, as we cannot find child from parent
         return -1;
     }
-
+    fetch_inode(cur, &cur_node);
+    fetch_inode(parent, &parent_node);
     // Update links count
-    cur_node->links -= 1;
-    node * tmp = NULL;
+    cur_node.links -= 1;
+    uint64_t tmp = 0;
+    
     // if links count is 0, remove the file/directory
-    if (cur_node->links == 0)
+    if (cur_node.links == 0)
     {
         // if it is a directory, unlink everything in it before freeing block
-        if ((cur_node->mode & S_IFMT) == S_IFDIR)
+        if ((cur_node.mode & S_IFMT) == S_IFDIR)
         {
-            for (int i = 0; i < cur_node->blocks; i++)
+            for (int i = 0; i < cur_node.blocks; i++)
             {
-                uint8_t *block = get_i_block(cur_node, i);
+                uint64_t block = get_i_block(cur, i);
                 // unlink each entry (children dir or nod) in the block
-                for (int j = 0; j < BLOCKSIZE && j+i*BLOCKSIZE < cur_node->size; j += NAME_BOUNDARY)
+                for (int j = 0; j < BLOCKSIZE && j+i*BLOCKSIZE < cur_node.size; j += NAME_BOUNDARY)
                 {
                     // get the address of the inode?
                     // char temp[NAME_BOUNDARY - ADDR_LENGTH];
                     // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
                     // tfs_unlink(temp);
                     read_block(&tmp, block, PATH_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH);
-                    sub_unlink(memspace, cur_node, tmp);//dont need to call tfs_unlink since we have the parent and child here. Saves time on traversal too
+                    sub_unlink(cur, tmp);//dont need to call tfs_unlink since we have the parent and child here. Saves time on traversal too
                 }
 
                 // put the whole block back to free list
@@ -295,15 +316,18 @@ int tfs_unlink(const char *path)
         else
         {
             // free all blocks that belong to this inode
-            for (int i = 0; i < cur_node->blocks; i++)
+            for (int i = 0; i < cur_node.blocks; i++)
             {
-                uint8_t *block = get_i_block(cur_node, i);
-                free_block(memspace, block);
+                uint8_t *block = get_i_block(cur, i);
+                free_block(drive, block);
             }
         }
 
         // free the inode
-        free_inode(cur_node);
+        free_inode(cur);
+    }
+    else{
+        commit_inode(&cur_node, cur);
     }
     return 0;
 }

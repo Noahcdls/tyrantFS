@@ -461,7 +461,7 @@ void *fetch_block(uint64_t my_node, uint64_t block_no, void *block)
 void *fetch_inode(uint64_t node, void *buff)
 {
     if (node == 0)
-        return;
+        return NULL;
     lseek(drive, node, SEEK_SET);
     read(drive, node, INODE_SIZE_BOUNDARY);
     return buff;

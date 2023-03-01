@@ -4,16 +4,16 @@
 #include <unistd.h>
 
 
-int add_to_directory(void * fs_space, node * parent, node * child, char * name);
-void * find_path_node(char * path);
-void *  add_block_to_node(void *fs_space, node *parent);
-int add_addr(node * parent, uint8_t *block, node *addr, char *name);
-void *check_block(uint8_t *block, char *name);
-void *check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
-void *check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
-void *check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
-void *get_i_block(node *cur_node, uint64_t i);
-int remove_link_from_parent(void * fs_space, node *parent_node, node *cur_node);
-int sub_unlink(void * fs_space, node * parent, node * child);
+int add_to_directory(uint64_t parent, uint64_t child, char *name);
+uint64_t find_path_node(char *path);
+uint64_t add_block_to_node(node *parent, uint64_t parent_loc);
+int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name);
+uint64_t check_block(uint8_t *block, char *name);
+uint64_t check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
+uint64_t check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
+uint64_t check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count);
+uint64_t get_i_block(node *cur_node, uint64_t i);
+int remove_link_from_parent(uint64_t parent, uint64_t cur_node);
+int sub_unlink(uint64_t parent, uint64_t child);
 
 
