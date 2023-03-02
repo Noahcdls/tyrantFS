@@ -513,7 +513,7 @@ static const struct fuse_operations operations = {
 
 int main(int argc, char **argv)
 {
-    if (argc < 2){
+    if (argc < 3){
 	printf("Not enough args. Add a directory path\n");
         return -1;
     }
@@ -530,5 +530,5 @@ int main(int argc, char **argv)
         return -1;
     }
     printf("Starting up FUSE in %s\n", path);
-    return fuse_main(argc, argv, &operations);
+    return fuse_main(argc -1, argv, &operations);
 }
