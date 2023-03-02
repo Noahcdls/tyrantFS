@@ -560,9 +560,12 @@ uint64_t find_path_node(char *path)
     }
     node *cur_node = malloc(sizeof(node));
     uint8_t *tmp_block = malloc(BLOCKSIZE);
-    uint64_t tmp_node = 0;
-    if (fetch_inode(root_node, cur_node) == NULL)
+    uint64_t tmp_node = root_node;
+    if (fetch_inode(root_node, cur_node) == NULL){
+	printf("Could not get root\n");
         return 0;
+    }
+
     strcpy(cpy_path, path);
     node_name = strtok(cpy_path, "/");
     while (node_name != 0) // should break this loop if you find the full path

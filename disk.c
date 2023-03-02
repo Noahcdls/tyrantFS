@@ -92,7 +92,9 @@ int tfs_mkfs(int fd)
     write_block(&root_node, block, 64 * 2 - 8, ADDR_LENGTH); // write root_node address
 
     read_block(buff, block, 56, ADDR_LENGTH);
-    printf("Double checking for root node that %ld == %ld\n", root_node, buff);
+    printf("Double checking . for root node that %ld == %ld\n", root_node,* (uint64_t*)buff);
+    read_block(buff, block, 64+56, ADDR_LENGTH);
+    printf("Double checking .. for root node that %ld == %ld\n", root_node, *(uint64_t*)buff);
     temp_node.data_time = time(NULL);
     temp_node.size = NAME_BOUNDARY * 2;
     temp_node.blocks = 1;

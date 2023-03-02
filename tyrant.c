@@ -20,6 +20,7 @@ uint8_t *memspace = NULL;
 */
 int tfs_mkdir(const char *path, mode_t m)
 {
+	printf("Starting mkdir\n");
     printf("CALLING MKDIR with path %s\n\n", path);
     node parent_node;
     uint64_t parent = 0;
@@ -101,6 +102,7 @@ int tfs_mkdir(const char *path, mode_t m)
 
 int tfs_mknod(const char *path, mode_t m, dev_t d)
 {
+	printf("Startind mknod\n");
     uint64_t parent = 0;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1)); // for us to hold path
 
@@ -169,6 +171,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
 /// @return 0 success, -1 failure
 int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
+	printf("Starting readdir\n");
 
     uint64_t dir_loc = find_path_node((char *)path);
     if (dir_loc == 0)
@@ -207,6 +210,7 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
 
 int tfs_open(const char *path, struct fuse_file_info *fi)
 {
+	printf("Starting open\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -241,6 +245,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
 /// @return 0 success, -1 failure
 int tfs_unlink(const char *path)
 {
+	printf("starting unlink\n");
     // first check if the pathname is valid
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
@@ -353,6 +358,7 @@ int tfs_unlink(const char *path)
 /// @return amount of actually read data
 int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+	printf("starting read\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -393,6 +399,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
 /// @return amount of actually written data
 int tfs_write(const char *path, const char *buff, size_t size, off_t offset, struct fuse_file_info *fi)
 {
+	printf("Starting write\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -440,6 +447,7 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
 
 int tfs_truncate(const char *path, off_t length)
 {
+	printf("Starting truncate\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -485,7 +493,7 @@ int tfs_getattr(const char * path, struct stat * st){
     st->st_atime = (time_t)cur_node.access_time;
     st->st_mtime = (time_t)cur_node.data_time;
     st->st_ctime = (time_t)cur_node.change_time;
-
+    printf("Returning stat for %s\n", (char*)path);
     return 0;
 }
 
