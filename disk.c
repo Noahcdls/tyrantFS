@@ -79,9 +79,11 @@ int tfs_mkfs(int fd)
     lseek(fd, root_node, SEEK_SET);
     read(fd, &temp_node, sizeof(node));
     temp_node.mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH; // User, group, and other can only read
+    printf("Temp node mode %x\n", temp_node.mode);
     temp_node.access_time = (uint64_t)time(NULL);
     temp_node.creation_time = (uint64_t)time(NULL);
     uint64_t block = allocate_block(drive);
+    printf("Block is at %ld\n", block);
     temp_node.direct_blocks[0] = block;
     char path1[] = ".";
     char path2[] = "..";
@@ -100,6 +102,8 @@ int tfs_mkfs(int fd)
     temp_node.blocks = 1;
     temp_node.links = 1;
     commit_inode(&temp_node, root_node);
+    fetch_inode(root_node, &temp_node);
+    printf("double check mode %x\n", temp_node.mode);
     printf("Finished making FS\n");
     return 0;
 }
@@ -472,17 +476,25 @@ void *fetch_block(uint64_t my_node, uint64_t block_no, void *block)
 /// @param node offset to where node is located
 /// @param buff buffer to place inode
 /// @return returns buff
-void *fetch_inode(uint64_t node, void *buff)
+void *fetch_inode(uint64_t my_node, void *buff)
 {
-    if (node == 0)
+    if (my_node == 0)
         return NULL;
-    lseek(drive, node, SEEK_SET);
-    read(drive, buff, INODE_SIZE_BOUNDARY);
+    int64_t sought_to =  lseek(drive, my_node, SEEK_SET);
+    printf("Fetched inode at offset %ld\n", sought_to);
+    int64_t bytes = read(drive, buff, sizeof(node));
+    printf("Read %ld bytes to fetch inode\n", bytes);
+    printf("Size of node is %ld\n", sizeof(node));
     return buff;
 }
 
 int commit_inode(node *my_node, uint64_t node_loc)
 {
-    lseek(drive, node_loc, SEEK_SET);
-    return write(drive, my_node, sizeof(node));
+    int64_t sought_to = lseek(drive, node_loc, SEEK_SET);
+    printf("Sought to %ld for committing node\n", sought_to);
+    int64_t bytes = write(drive, my_node, sizeof(node));
+    printf("Wrote %ld bytes to commit node\n", bytes);
+    printf("Size of node is %ld\n", sizeof(node));
+    return bytes;
+    
 }

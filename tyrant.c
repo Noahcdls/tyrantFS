@@ -473,16 +473,20 @@ int tfs_truncate(const char *path, off_t length)
 int tfs_getattr(const char * path, struct stat * st){
     printf("getting attribute\n");
     uint64_t cur = find_path_node((char *)path);
+    printf("Cur node location is %ld\n", cur);
     if(cur == 0){
         printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
     node cur_node;
+    memset(&cur_node, 0, sizeof(node));
     fetch_inode(cur, &cur_node);
     memset(st, 0, sizeof(struct stat));
 
     st->st_ino = (uint64_t)(cur - BLOCKSIZE)/INODE_SIZE_BOUNDARY;
     st->st_mode = cur_node.mode;
+    printf("cur node is DIR? %x %x\n", (cur_node.mode), S_IFDIR);
+    printf("IS DIR? %x\n", (st->st_mode & S_IFDIR)); 
     st->st_nlink = cur_node.links;
     st->st_size = cur_node.size;
     st->st_blocks = cur_node.blocks;

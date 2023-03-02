@@ -2,6 +2,7 @@
 
 uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
 {
+	printf("Adding block to node\n");
     if (parent == NULL || parent_loc == 0)
     {
         printf("NULL PARENT\n\n");
@@ -147,6 +148,7 @@ uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
 /// @return 0 on success; -1 on failure
 int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
 {
+	printf("Removing link from parent\n");
     if (parent == 0)
         return -1;
     if (cur_node == 0)
@@ -196,6 +198,7 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
 
 int sub_unlink(uint64_t parent, uint64_t child)
 {
+	printf("Performing sub unlink\n");
     // remove link from its parent
     if (parent == 0 || child == 0)
         return -1;
@@ -262,6 +265,7 @@ int sub_unlink(uint64_t parent, uint64_t child)
 /// @return pointer to ith block success, NULL failure
 uint64_t get_i_block(node *cur_node, uint64_t i)
 {
+	printf("Getting ith block\n");
     // curnode cannot be NULL
     if (cur_node == NULL)
     {
@@ -347,6 +351,7 @@ uint64_t get_i_block(node *cur_node, uint64_t i)
 /// @return 0 success, -1 failure
 int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
 {
+	printf("Adding address\n");
     if (block == 0)
         return -1;
     char temp[NAME_BOUNDARY - ADDR_LENGTH];
@@ -387,6 +392,7 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
 */
 int add_to_directory(uint64_t parent, uint64_t child, char *name)
 {
+	printf("Adding to directory\n");
     if (parent == 0 || child == 0)
         return -1;
     node parent_node, child_node;
@@ -448,6 +454,7 @@ uint64_t check_block(uint8_t *block, char *name)
 */
 uint64_t check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
+	printf("Checking indirect block");
     if (block == NULL)
         return 0;
     uint64_t tmp_node = 0;
@@ -484,6 +491,7 @@ uint64_t check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 */
 uint64_t check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
+	printf("Checking dbl indirect\n");
     if (block == NULL)
         return 0;
     uint64_t tmp_node = 0;
@@ -519,6 +527,7 @@ uint64_t check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_coun
 */
 uint64_t check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
+	printf("Checking trpl indirect\n");
     if (block == NULL)
         return 0;
     uint64_t tmp_node = 0;
@@ -551,6 +560,7 @@ uint64_t check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_cou
 */
 uint64_t find_path_node(char *path)
 {
+	printf("Finding path\n");
     char cpy_path[NAME_BOUNDARY], *node_name;
 
     if (root_node == 0)
