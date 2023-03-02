@@ -463,6 +463,7 @@ int tfs_truncate(const char *path, off_t length)
 }
 
 int tfs_getattr(const char * path, struct stat * st){
+    printf("getting attribute\n");
     uint64_t cur = find_path_node((char *)path);
     if(cur == 0){
         printf("%s NOT FOUND\n\n", path);
