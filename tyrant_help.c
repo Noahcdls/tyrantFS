@@ -108,7 +108,7 @@ void *add_block_to_node(void *fs_space, node *parent)
         uint64_t dbl_blk_offset = (i - 12 - BLOCKSIZE / ADDR_LENGTH - (BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) % ((BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) / (BLOCKSIZE / ADDR_LENGTH) * ADDR_LENGTH;
         uint64_t indir_blk_offset = (i - 12 - BLOCKSIZE / ADDR_LENGTH - (BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) % ((BLOCKSIZE / ADDR_LENGTH) * (BLOCKSIZE / ADDR_LENGTH)) % (BLOCKSIZE / ADDR_LENGTH) * ADDR_LENGTH;
 
-        read_block(&dbl_blk, dbl_blk, trpl_blk_offset, ADDR_LENGTH);
+        read_block(&dbl_blk, trpl_blk, trpl_blk_offset, ADDR_LENGTH);
         if (dbl_blk == NULL || dbl_blk == 0)
         {
             dbl_blk = allocate_block(fs_space);
@@ -117,7 +117,7 @@ void *add_block_to_node(void *fs_space, node *parent)
                 free_block(fs_space, block);
                 return NULL;
             }
-            write_block(&dbl_blk, dbl_blk, trpl_blk_offset, ADDR_LENGTH);
+            write_block(&dbl_blk, trpl_blk, trpl_blk_offset, ADDR_LENGTH);
         }
         read_block(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH);
         if (indir_blk == NULL || indir_blk == 0)
@@ -534,7 +534,7 @@ void *check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
             return NULL;
         uint8_t *block_addr;
         memcpy(&block_addr, block + i, ADDR_LENGTH);
-        tmp_node = check_dbl_indirect_blk(block_addr, name, block_count);
+        tmp_node = check_indirect_blk(block_addr, name, block_count);
         if (tmp_node != NULL)
             return tmp_node;
     }
@@ -629,7 +629,7 @@ void *find_path_node(char *path)
         if (block_cnt <= 0)
             return NULL;
 
-        tmp_node = check_trpl_indirect_blk(cur_node->indirect_blocks, node_name, &block_cnt);
+        tmp_node = check_trpl_indirect_blk(cur_node->trpl_indirect, node_name, &block_cnt);
         if (tmp_node != NULL) // broke out of for loop and have a valid inode
         {
             cur_node = tmp_node;

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <time.h>
 
 
 int add_to_directory(void * fs_space, node * parent, node * child, char * name);
@@ -15,5 +16,5 @@ void *check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 void *get_i_block(node *cur_node, uint64_t i);
 int remove_link_from_parent(void * fs_space, node *parent_node, node *cur_node);
 int sub_unlink(void * fs_space, node * parent, node * child);
-
+uint64_t get_current_time_in_nsec();
 
