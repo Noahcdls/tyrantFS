@@ -102,7 +102,6 @@ int tfs_mkdir(const char *path, mode_t m)
 int tfs_mknod(const char *path, mode_t m, dev_t d)
 {
     uint64_t parent = 0;
-    node parent_node;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1)); // for us to hold path
 
     int i;
@@ -186,7 +185,7 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
     char name[MAX_NAME_LENGTH];
     while (block_count < total_blocks && byte_count < total_bytes)
     {
-        block = get_i_block(dir_loc, block_count);
+        block = get_i_block(&dir, block_count);
         if (block == 0)
         {
             block++;
@@ -277,7 +276,7 @@ int tfs_unlink(const char *path)
         parent = find_path_node(temp);
     else
         parent = root_node;
-    if (parent == NULL)
+    if (parent == 0)
     {
         free(temp);
         return -1;
@@ -309,7 +308,7 @@ int tfs_unlink(const char *path)
         {
             for (int i = 0; i < cur_node.blocks; i++)
             {
-                uint64_t block = get_i_block(cur, i);
+                uint64_t block = get_i_block(&cur_node, i);
                 // unlink each entry (children dir or nod) in the block
                 for (int j = 0; j < BLOCKSIZE && j + i * BLOCKSIZE < cur_node.size; j += NAME_BOUNDARY)
                 {
@@ -322,7 +321,7 @@ int tfs_unlink(const char *path)
                 }
 
                 // put the whole block back to free list
-                free_block(memspace, block);
+                free_block(drive, block);
             }
         }
         else
@@ -330,7 +329,7 @@ int tfs_unlink(const char *path)
             // free all blocks that belong to this inode
             for (int i = 0; i < cur_node.blocks; i++)
             {
-                uint8_t *block = get_i_block(cur, i);
+                uint64_t block = get_i_block(&cur_node, i);
                 free_block(drive, block);
             }
         }
@@ -368,7 +367,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
     uint64_t blocks = offset / BLOCKSIZE;
     uint64_t loc = offset % BLOCKSIZE;
     uint64_t byte_counter = offset + size > total_bytes ? total_bytes - offset : size;
-    uint8_t *block = NULL;
+    uint64_t block = 0;
     uint64_t tmp = 0;
     cur_node.access_time = get_current_time_in_nsec();
     commit_inode(&cur_node, cur);
@@ -406,7 +405,7 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
     uint64_t blocks = offset / BLOCKSIZE;
     uint64_t loc = offset % BLOCKSIZE;
     uint64_t byte_counter = size;
-    uint8_t *block = NULL;
+    uint64_t block = 0;
     uint64_t tmp = 0;
     cur_node.data_time = get_current_time_in_nsec();
     cur_node.change_time = cur_node.data_time;
@@ -417,7 +416,7 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
         for (uint64_t i = total_blocks; i < final_blocks; i++)
         {
             block = add_block_to_node(&cur_node, cur);
-            if (block == NULL)
+            if (block == 0)
                 break;
         }
     }
@@ -449,13 +448,13 @@ int tfs_truncate(const char *path, off_t length)
     if (cur_node.size <= length)
         return 0;
     uint64_t block_no = length / BLOCKSIZE;
-    uint8_t *block = get_i_block(&cur_node, block_no);
+    uint64_t block = get_i_block(&cur_node, block_no);
     for (uint32_t i = block_no + 1; i < cur_node.blocks; i++)
     {
         block = get_i_block(&cur_node, i);
-        free_block(memspace, block);
+        free_block(drive, block);
     }
-    cur_node.change_time = get_current_time_in_nsec;
+    cur_node.change_time = get_current_time_in_nsec();
     cur_node.data_time = cur_node.change_time;
     cur_node.size = length;
     cur_node.blocks = cur_node.blocks - (block_no + 1);

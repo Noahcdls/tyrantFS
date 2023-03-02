@@ -12,11 +12,11 @@
 uint64_t root_node;
 
 int drive = -1; // field descriptor of drive we are working with
-volatile uint64_t drivesize = 0;
-volatile uint64_t inode_byte_boundary = 0;
-volatile uint64_t num_blocks = 0;
-volatile uint64_t inode_blocks = 0;
-volatile uint64_t data_blocks = 0;
+uint64_t drivesize = 0;
+uint64_t inode_byte_boundary = 0;
+uint64_t num_blocks = 0;
+uint64_t inode_blocks = 0;
+uint64_t data_blocks = 0;
 
 /*
 @brief mkfs for tyrant with define options
@@ -69,7 +69,7 @@ int tfs_mkfs(int fd)
     root_node = allocate_inode(fd);
     node temp_node;
     lseek(fd, root_node, SEEK_SET);
-    read(fd, &temp_node, INODE_SIZE_BOUNDARY);
+    read(fd, &temp_node, sizeof(node));
     temp_node.mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH; // User, group, and other can only read
     temp_node.access_time = (uint32_t)time(NULL);
     temp_node.creation_time = (uint32_t)time(NULL);
@@ -104,7 +104,7 @@ uint64_t allocate_inode(int fd)
     node *inode_ptr = malloc(sizeof(node));
     for (int i = BLOCKSIZE; i < inode_byte_boundary; i += INODE_SIZE_BOUNDARY)
     {
-        read(drive, inode_ptr, INODE_SIZE_BOUNDARY); // read ptr automatically shifts us up to next inode
+        read(drive, inode_ptr, sizeof(node)); // read ptr automatically shifts us up to next inode
         if (inode_ptr->mode == 0)
         { // cleared mode means not in use
             free(inode_ptr);
@@ -333,7 +333,7 @@ int free_block(int fd, uint64_t block)
     }
     next_block -= BLOCKSIZE;
     // if the whole block is full, make block next super block with link to the full one
-    seek(drive, block, SEEK_SET);
+    lseek(drive, block, SEEK_SET);
     write(drive, buff, BLOCKSIZE); // wipe block
     // *(uint64_t *)(block+BLOCKSIZE-8) = *(uint64_t *)fs_space; //last address in freed block is current superblock that's full
     lseek(drive, block + BLOCKSIZE - ADDR_LENGTH, SEEK_SET);
@@ -463,7 +463,7 @@ void *fetch_inode(uint64_t node, void *buff)
     if (node == 0)
         return NULL;
     lseek(drive, node, SEEK_SET);
-    read(drive, node, INODE_SIZE_BOUNDARY);
+    read(drive, buff, INODE_SIZE_BOUNDARY);
     return buff;
 }
 

@@ -126,10 +126,10 @@ uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
         if (indir_blk == 0)
         {
             indir_blk = allocate_block(drive);
-            if (indir_blk == NULL)
+            if (indir_blk == 0)
             {
                 free_block(drive, block);
-                return NULL;
+                return 0;
             }
             write_block(&indir_blk, dbl_blk, dbl_blk_offset, ADDR_LENGTH);
             commit_inode(parent, parent_loc);
@@ -185,7 +185,7 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
                     parent_node.blocks--;
                 }
                 parent_node.data_time = get_current_time_in_nsec();
-                parent_node.change_time = parent_node.data_time();
+                parent_node.change_time = parent_node.data_time;
                 commit_inode(&parent_node, parent);
                 return 0;
             }
@@ -363,9 +363,9 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
         if (empty_space == 0)                                         // nothing written here
         {                                                             // no name so can write over
             write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH); // write name
-            printf("Writing address %p at location %p\n", addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
+            printf("Writing address %ld at location %ld\n", addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
             write_block(&addr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
-            printf("%p added as address\n", addr);
+            printf("%ld added as address\n", addr);
             parent_node.size += NAME_BOUNDARY;
             addr_node.links++;
             parent_node.data_time = get_current_time_in_nsec();
@@ -421,7 +421,7 @@ uint64_t check_block(uint8_t *block, char *name)
 {
     printf("Searching for %s\n", name);
     if (block == NULL)
-        return NULL;
+        return 0;
     char tmp_name[NAME_BOUNDARY - ADDR_LENGTH + 1];
     for (int i = 0; i < BLOCKSIZE; i += NAME_BOUNDARY)
     {
@@ -429,10 +429,10 @@ uint64_t check_block(uint8_t *block, char *name)
         // printf("%s is %d\n", tmp_name, strcmp(tmp_name, name));
         if (strcmp(tmp_name, name) == 0) // found a match in the name
         {
-            uint64_t node_ptr = NULL;
+            uint64_t node_ptr = 0;
             printf("Reading address at location %p\n", block + i + NAME_BOUNDARY - ADDR_LENGTH);
-            read_block(&node_ptr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
-            printf("Return with address %p\n", node_ptr);
+            memcpy(&node_ptr, block + i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
+            printf("Return with address %ld\n", node_ptr);
             return node_ptr;
         }
     }
@@ -507,7 +507,7 @@ uint64_t check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_coun
         }
     }
     free(data_block);
-    return NULL;
+    return 0;
 }
 
 /*
@@ -556,13 +556,13 @@ uint64_t find_path_node(char *path)
     if (root_node == 0)
     {
         printf("NULL ROOT\n");
-        return NULL;
+        return 0;
     }
     node *cur_node = malloc(sizeof(node));
     uint8_t *tmp_block = malloc(BLOCKSIZE);
     uint64_t tmp_node = 0;
     if (fetch_inode(root_node, cur_node) == NULL)
-        return NULL;
+        return 0;
     strcpy(cpy_path, path);
     node_name = strtok(cpy_path, "/");
     while (node_name != 0) // should break this loop if you find the full path
@@ -574,23 +574,23 @@ uint64_t find_path_node(char *path)
             if (block_cnt == 0)
             { // no more blocks means you didnt find out
                 free(cur_node);
-                return NULL;
+                return 0;
             }
             if (cur_node->direct_blocks[i] == 0)
             { // bad case
                 free(cur_node);
-                return NULL;
+                return 0;
             }
 
             lseek(drive, cur_node->direct_blocks[i], SEEK_SET);
             write(drive, tmp_block, BLOCKSIZE);
             tmp_node = check_block(tmp_block, node_name); // check block for addresses
             block_cnt--;
-            if (tmp_node != NULL) // found the next inode
+            if (tmp_node != 0) // found the next inode
                 break;
         }
 
-        if (tmp_node != NULL) // broke out of for loop and have a valid inode
+        if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
             fetch_inode(tmp_node, cur_node);
             node_name = strtok(NULL, "/");
@@ -600,13 +600,13 @@ uint64_t find_path_node(char *path)
         {
             free(tmp_block);
             free(cur_node);
-            return NULL;
+            return 0;
         }
 
         lseek(drive, cur_node->indirect_blocks, SEEK_SET);
         write(drive, tmp_block, BLOCKSIZE);
         tmp_node = check_indirect_blk(tmp_block, node_name, &block_cnt);
-        if (tmp_node != NULL) // broke out of for loop and have a valid inode
+        if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
             fetch_inode(tmp_node, cur_node);
             node_name = strtok(NULL, "/");
@@ -617,13 +617,13 @@ uint64_t find_path_node(char *path)
         {
             free(tmp_block);
             free(cur_node);
-            return NULL;
+            return 0;
         }
 
         lseek(drive, cur_node->dbl_indirect, SEEK_SET);
         write(drive, tmp_block, BLOCKSIZE);
         tmp_node = check_dbl_indirect_blk(tmp_block, node_name, &block_cnt);
-        if (tmp_node != NULL) // broke out of for loop and have a valid inode
+        if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
             fetch_inode(tmp_node, cur_node);
             node_name = strtok(NULL, "/");
@@ -634,13 +634,13 @@ uint64_t find_path_node(char *path)
         {
             free(tmp_block);
             free(cur_node);
-            return NULL;
+            return 0;
         }
 
         lseek(drive, cur_node->trpl_indirect, SEEK_SET);
         write(drive, tmp_block, BLOCKSIZE);
         tmp_node = check_trpl_indirect_blk(tmp_block, node_name, &block_cnt);
-        if (tmp_node != NULL) // broke out of for loop and have a valid inode
+        if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
             fetch_inode(tmp_node, cur_node);
             node_name = strtok(NULL, "/");
@@ -649,7 +649,7 @@ uint64_t find_path_node(char *path)
 
         free(tmp_block);
         free(cur_node);
-        return NULL; // nothing found
+        return 0; // nothing found
     }
     free(tmp_block);
     free(cur_node);
