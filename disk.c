@@ -35,13 +35,13 @@ int tfs_mkfs(int fd)
     ioctl(fd, BLKGETSIZE64, &drivesize);
     num_blocks = drivesize / BLOCKSIZE;
     inode_blocks = num_blocks / 65; // following ext4 standard of 1 inode for every 16KB of data or 1 inode block for every 64 data blocks
-    data_blocks = inode_blocks * 64;
+    data_blocks = inode_blocks * 64 - 1;//leave 1 for superblock
     inode_byte_boundary = (inode_blocks + 1) * BLOCKSIZE;
-
+    printf("Drive is %.3f GB and has %ld blocks!\ninode blocks: %ld\ndata blocks: %ld\n\n", (float)drivesize/1024/1024/1024, num_blocks, inode_blocks, data_blocks);
     lseek(fd, 0, SEEK_SET);
     for (uint64_t i = 0; i < inode_blocks + 1; i++) // clear out inodes and super block
         write(fd, buff, BLOCKSIZE);
-
+    printf("Cleared out inodes and super block");
     lseek(fd, 0, SEEK_SET);
     write(fd, &inode_byte_boundary, ADDR_LENGTH); // superblock holds first free block address
 
@@ -53,21 +53,29 @@ int tfs_mkfs(int fd)
         lseek(fd, free_blockptr, SEEK_SET); // seek to beginning of block
         write(fd, buff, BLOCKSIZE);         // clear out block
         lseek(fd, -BLOCKSIZE, SEEK_CUR);    // go back to beginning
-
+	//printf("Free block ptr is at %ld\n", free_blockptr);
+	//sleep(1);
         block_ptr = inode_byte_boundary + addr_counter * BLOCKSIZE + BLOCKSIZE; // next free block
         for (uint64_t i = 0; i < BLOCKSIZE; i += 8)                             // write one full block
         {
-            if (addr_counter >= NUM_FREE_BLOCKS) // break when we've hit our max
+            if (addr_counter >= data_blocks){// break when we've hit our max
                 break;
+	    }
             write(fd, &block_ptr, ADDR_LENGTH); // automatically increments write ptr by 8bytes so need to shift
             block_ptr += BLOCKSIZE;           // add blocksize to offset where next block is
             addr_counter++;                   // added 1 block to list
+	    //printf("Addr counter updated to %ld\n", addr_counter);
         }
+	//sleep(2);
+	//printf("Old block pointer %ld\n", free_blockptr);
         free_blockptr = block_ptr - BLOCKSIZE; // go back and write the last address stored
+	//printf("New block pointer %ld\n", free_blockptr);
     }
 
+    printf("Finished writing in data blocks\n");
     root_node = allocate_inode(fd);
     node temp_node;
+    printf("Allocated a root!\n");
     lseek(fd, root_node, SEEK_SET);
     read(fd, &temp_node, sizeof(node));
     temp_node.mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH; // User, group, and other can only read
@@ -87,6 +95,7 @@ int tfs_mkfs(int fd)
     temp_node.blocks = 1;
     temp_node.links = 1;
     commit_inode(&temp_node, root_node);
+    printf("Finished making FS\n");
     return 0;
 }
 

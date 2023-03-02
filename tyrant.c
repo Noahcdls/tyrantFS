@@ -512,9 +512,12 @@ static const struct fuse_operations operations = {
 
 int main(int argc, char **argv)
 {
-    if (argc < 2)
+    if (argc < 2){
+	printf("Not enough args. Add a directory path\n");
         return -1;
+    }
     char * path = argv[argc-1];
+    printf("The path we are looking for is %s\n", path);
     int fd = open(path, O_RDWR, 0666);
     if (fd < 0){
         printf("\n\nFailed to open %s\n\n", path);
@@ -525,5 +528,6 @@ int main(int argc, char **argv)
         printf("\n\nFailed to make file system\n\n");
         return -1;
     }
+    printf("Starting up FUSE in %s\n", path);
     return fuse_main(argc, argv, &operations);
 }
