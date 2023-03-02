@@ -184,6 +184,8 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
                     free_block(drive, last_block);
                     parent_node.blocks--;
                 }
+                parent_node.data_time = get_current_time_in_nsec();
+                parent_node.change_time = parent_node.data_time();
                 commit_inode(&parent_node, parent);
                 return 0;
             }
@@ -366,6 +368,9 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
             printf("%p added as address\n", addr);
             parent_node.size += NAME_BOUNDARY;
             addr_node.links++;
+            parent_node.data_time = get_current_time_in_nsec();
+            parent_node.change_time = parent_node.data_time;
+            addr_node.change_time = parent_node.data_time;
             commit_inode(&parent_node, parent);
             commit_inode(&addr_node, addr);
             return 0;
@@ -649,4 +654,12 @@ uint64_t find_path_node(char *path)
     free(tmp_block);
     free(cur_node);
     return tmp_node;
+}
+
+
+uint64_t get_current_time_in_nsec()
+{
+    time_t current_time;
+    time(&current_time);
+    return (uint64_t) current_time;
 }

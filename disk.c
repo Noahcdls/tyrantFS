@@ -176,7 +176,7 @@ int write_inode(uint64_t inode, void *buff)
 @param bytes bytes you want to read
 @return valid number of bytes read
 */
-uint32_t read_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
+int read_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
 {
     if (buff == NULL || block == 0)
         return 0;
@@ -189,12 +189,12 @@ uint32_t read_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
     if (bytes_avail < bytes)
     { // asking for more bytes than what is left so read what we can
         ssize_t read_bytes = read(drive, buff, bytes_avail);
-        return read_bytes > 0 ? read_bytes : 0;
+        return read_bytes;
     }
     else
     { // can fill buffer with correct number of bytes
         ssize_t read_bytes = read(drive, buff, bytes);
-        return read_bytes > 0 ? read_bytes : 0;
+        return read_bytes;
     }
     return 0;
 }
@@ -207,7 +207,7 @@ uint32_t read_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
 @param bytes bytes you want to write
 @return valid number of bytes written
 */
-uint32_t write_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
+int write_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
 {
     if (buff == NULL)
         return 0;
@@ -219,12 +219,12 @@ uint32_t write_block(void *buff, uint64_t block, off_t offset, uint64_t bytes)
     if (bytes_avail < bytes)
     { // want to write more bytes than what is left in block
         ssize_t written = write(drive, buff, bytes_avail);
-        return written > 0 ? written : 0;
+        return written;
     }
     else
     { // write bytes to block
         ssize_t written = write(drive, buff, bytes);
-        return written > 0 ? written : 0;
+        return written;
     }
     return 0;
 }
