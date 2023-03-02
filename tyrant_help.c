@@ -221,30 +221,30 @@ int sub_unlink(uint64_t parent, uint64_t child)
         // if it is a directory, unlink everything in it before freeing block
         if ((child_node.mode & S_IFMT) == S_IFDIR)
         {
-            for (int i = 0; i < child_node.blocks; i++)
+            for (uint64_t i = child_node.blocks; i > 0; i--)
             {
-                block = get_i_block(&child_node, i);
+                block = get_i_block(&child_node, i-1);
                 // unlink each entry (children dir or nod) in the block
-                for (int j = 0; j < BLOCKSIZE && j + i * BLOCKSIZE < child_node.size; j += NAME_BOUNDARY)
+                for (int j = (i == child_node.blocks) ? child_node.size % BLOCKSIZE : BLOCKSIZE; j > 0; j -= NAME_BOUNDARY)
                 {
                     // get the address of the inode?
                     // char temp[NAME_BOUNDARY - ADDR_LENGTH];
-                    read_block(&tmp, block, j + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH);
+                    read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
                     // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
 
                     sub_unlink(child, tmp);
                 }
 
                 // put the whole block back to free list
-                free_block(drive, block);
+                free_block(drive, block-1);
             }
         }
         else
         {
             // free all blocks that belong to this inode
-            for (int i = 0; i < child_node.blocks; i++)
+            for (uint64_t i = child_node.blocks; i > 0; i--)
             {
-                block = get_i_block(&child_node, i);
+                block = get_i_block(&child_node, i-1);
                 free_block(drive, block);
             }
         }
