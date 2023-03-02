@@ -87,6 +87,7 @@ int tfs_mkfs(int fd)
     temp_node.direct_blocks[0] = block;
     char path1[] = ".";
     char path2[] = "..";
+    write_block(buff, block, 0, BLOCKSIZE);
     write_block(path1, block, 0, sizeof(path1));           // 56 bytes for directory name
     write_block(&root_node, block, 56, ADDR_LENGTH); // write root_node address
 

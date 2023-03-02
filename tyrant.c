@@ -150,6 +150,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     data_node.change_time = data_node.creation_time;
     data_node.data_time = data_node.creation_time;
     commit_inode(&data_node, data);
+    printf("Adding %s as part of path %s\n", temp+i+1, (char*)path);
     int result = add_to_directory(parent, data, (temp + i + 1));
     if (result != 0)
     {
@@ -191,17 +192,21 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
         block = get_i_block(&dir, block_count);
         if (block == 0)
         {
-            block++;
+            block_count++;
             byte_count += BLOCKSIZE;
+            continue;
         }
         for (uint64_t i = 0; i < BLOCKSIZE && byte_count < total_bytes; i += PATH_BOUNDARY)
         {
             read_block(name, block, i, MAX_NAME_LENGTH);
             printf("%s\n", name);
             byte_count += PATH_BOUNDARY;
-            if (name[0] == '\0')
+            if (name[0] == '\0'){
+                printf("empty name\n");
                 continue;
+                }
             filler(buffer, name, NULL, 0);
+            
         }
         block_count++;
     }
@@ -360,7 +365,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
 {
 	printf("starting read\n");
     uint64_t cur = find_path_node((char *)path);
-    if (cur == 0)
+    if (cur == 0)//
         return -ENOENT;
     node cur_node;
     fetch_inode(cur, &cur_node);

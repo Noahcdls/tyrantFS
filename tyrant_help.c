@@ -351,9 +351,11 @@ uint64_t get_i_block(node *cur_node, uint64_t i)
 /// @return 0 success, -1 failure
 int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
 {
-	printf("Adding address\n");
-    if (block == 0)
+	printf("\n\nAdding address\n\n");
+    if (block == 0 || parent == 0 || addr == 0){
+        printf("Bad arguments for add address\n\n");
         return -1;
+        }
     char temp[NAME_BOUNDARY - ADDR_LENGTH];
     uint8_t empty_space = 0;
     node addr_node;
@@ -367,10 +369,11 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
         read_block(&empty_space, block, i, 1);                        // grab a single byte. If that byte is 0, that means the name slot is empty
         if (empty_space == 0)                                         // nothing written here
         {                                                             // no name so can write over
+            printf("Writing name %s\n", temp);
             write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH); // write name
-            printf("Writing address %ld at location %ld\n", addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
+            printf("\n\nWriting address %ld at location %ld\n\n", addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
             write_block(&addr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
-            printf("%ld added as address\n", addr);
+            printf("\n\n%ld added as address\n\n", addr);
             parent_node.size += NAME_BOUNDARY;
             addr_node.links++;
             parent_node.data_time = get_current_time_in_nsec();
@@ -378,6 +381,7 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
             addr_node.change_time = parent_node.data_time;
             commit_inode(&parent_node, parent);
             commit_inode(&addr_node, addr);
+            printf("\n\nFinished adding address\n\n");
             return 0;
         }
     }
@@ -393,8 +397,9 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
 int add_to_directory(uint64_t parent, uint64_t child, char *name)
 {
 	printf("Adding to directory\n");
-    if (parent == 0 || child == 0)
+    if (parent == 0 || child == 0){
         return -1;
+        }
     node parent_node, child_node;
     fetch_inode(parent, &parent_node);
     fetch_inode(child, &child_node);
@@ -411,6 +416,7 @@ int add_to_directory(uint64_t parent, uint64_t child, char *name)
         return add_addr(parent, block, child, name);
     }
     block = get_i_block(&parent_node, parent_node.blocks - 1);
+    printf("Going to add child to block %ld\n", block);
     return add_addr(parent, block, child, name);
 
     return 0;
@@ -431,7 +437,8 @@ uint64_t check_block(uint8_t *block, char *name)
     char tmp_name[NAME_BOUNDARY - ADDR_LENGTH + 1];
     for (int i = 0; i < BLOCKSIZE; i += NAME_BOUNDARY)
     {
-        memcpy(tmp_name, block + i, NAME_BOUNDARY - ADDR_LENGTH); // copy name
+        memcpy(&tmp_name, block + i, NAME_BOUNDARY - ADDR_LENGTH); // copy name
+        //printf("The name is copied is %s\n", tmp_name);
         // printf("%s is %d\n", tmp_name, strcmp(tmp_name, name));
         if (strcmp(tmp_name, name) == 0) // found a match in the name
         {
@@ -580,12 +587,15 @@ uint64_t find_path_node(char *path)
     node_name = strtok(cpy_path, "/");
     while (node_name != 0) // should break this loop if you find the full path
     {
+        printf("%s is the current file/dir we are looking for\n", node_name);
         tmp_node = 0;
         uint64_t block_cnt = cur_node->blocks; // check how many blocks inode uses to limit blocks checked
+        printf("Current inode has %ld blocks\n", block_cnt);
         for (int i = 0; i < 12; i++)
         {
             if (block_cnt == 0)
             { // no more blocks means you didnt find out
+                printf("Node has no more blocks\n");
                 free(cur_node);
                 return 0;
             }
@@ -595,8 +605,10 @@ uint64_t find_path_node(char *path)
                 return 0;
             }
 
-            lseek(drive, cur_node->direct_blocks[i], SEEK_SET);
-            write(drive, tmp_block, BLOCKSIZE);
+            int64_t sought_to = lseek(drive, cur_node->direct_blocks[i], SEEK_SET);
+            printf("Sought to %ld to look for inode\n", sought_to);
+            int64_t bytes = read(drive, tmp_block, BLOCKSIZE);
+            printf("Wrote %ld bytes into temp block\n", bytes);
             tmp_node = check_block(tmp_block, node_name); // check block for addresses
             block_cnt--;
             if (tmp_node != 0) // found the next inode
