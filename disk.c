@@ -75,21 +75,24 @@ int tfs_mkfs(int fd)
     printf("Finished writing in data blocks\n");
     root_node = allocate_inode(fd);
     node temp_node;
-    printf("Allocated a root!\n");
+    printf("Allocated a root at %ld!\n", root_node);
     lseek(fd, root_node, SEEK_SET);
     read(fd, &temp_node, sizeof(node));
     temp_node.mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH; // User, group, and other can only read
-    temp_node.access_time = (uint32_t)time(NULL);
-    temp_node.creation_time = (uint32_t)time(NULL);
+    temp_node.access_time = (uint64_t)time(NULL);
+    temp_node.creation_time = (uint64_t)time(NULL);
     uint64_t block = allocate_block(drive);
     temp_node.direct_blocks[0] = block;
     char path1[] = ".";
     char path2[] = "..";
     write_block(path1, block, 0, sizeof(path1));           // 56 bytes for directory name
-    write_block(&root_node, block, 56, sizeof(root_node)); // write root_node address
+    write_block(&root_node, block, 56, ADDR_LENGTH); // write root_node address
 
     write_block(path2, block, 64, sizeof(path2));
-    write_block(&root_node, block, 64 * 2 - 8, sizeof(root_node)); // write root_node address
+    write_block(&root_node, block, 64 * 2 - 8, ADDR_LENGTH); // write root_node address
+
+    read_block(buff, block, 56, ADDR_LENGTH);
+    print("Double checking for root node that %ld == %ld\n", root_node, buff);
     temp_node.data_time = time(NULL);
     temp_node.size = NAME_BOUNDARY * 2;
     temp_node.blocks = 1;
@@ -479,5 +482,5 @@ void *fetch_inode(uint64_t node, void *buff)
 int commit_inode(node *my_node, uint64_t node_loc)
 {
     lseek(drive, node_loc, SEEK_SET);
-    return write(drive, my_node, INODE_SIZE_BOUNDARY) > 0 ? 0 : -1;
+    return write(drive, my_node, sizeof(node));
 }
