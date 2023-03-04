@@ -119,13 +119,17 @@ uint64_t allocate_inode(int fd)
 {
     if (drive < 0)
         return 0;
-    lseek(drive, BLOCKSIZE, SEEK_SET);
+    uint64_t sought_to = lseek(drive, BLOCKSIZE, SEEK_SET);
+    printf("Moving head initially to %lx\n", sought_to);
     node *inode_ptr = malloc(sizeof(node));
-    for (int i = BLOCKSIZE; i < inode_byte_boundary; i += INODE_SIZE_BOUNDARY)
+    for (uint64_t i = BLOCKSIZE; i < inode_byte_boundary; i += INODE_SIZE_BOUNDARY)
     {
-        read(drive, inode_ptr, sizeof(node)); // read ptr automatically shifts us up to next inode
+	sought_to = lseek(drive, i, SEEK_SET);
+	printf("Seeking to %lx\n", sought_to);
+        uint64_t bytes_read = read(drive, inode_ptr, sizeof(node)); // read ptr automatically shifts us up to next inode
         if (inode_ptr->mode == 0)
         { // cleared mode means not in use
+	    printf("\n\nAllocating inode at address %lx. Read %lx bytes\n\n", i, bytes_read);
             free(inode_ptr);
             return i;
         }
@@ -482,20 +486,20 @@ void *fetch_inode(uint64_t my_node, void *buff)
     if (my_node == 0)
         return NULL;
     int64_t sought_to =  lseek(drive, my_node, SEEK_SET);
-    printf("Fetched inode at offset %ld\n", sought_to);
+   // printf("Fetched inode at offset %ld\n", sought_to);
     int64_t bytes = read(drive, buff, sizeof(node));
-    printf("Read %ld bytes to fetch inode\n", bytes);
-    printf("Size of node is %ld\n", sizeof(node));
+   // printf("Read %ld bytes to fetch inode\n", bytes);
+   // printf("Size of node is %ld\n", sizeof(node));
     return buff;
 }
 
 int commit_inode(node *my_node, uint64_t node_loc)
 {
     int64_t sought_to = lseek(drive, node_loc, SEEK_SET);
-    printf("Sought to %ld for committing node\n", sought_to);
+   // printf("Sought to %ld for committing node\n", sought_to);
     int64_t bytes = write(drive, my_node, sizeof(node));
-    printf("Wrote %ld bytes to commit node\n", bytes);
-    printf("Size of node is %ld\n", sizeof(node));
+   // printf("Wrote %ld bytes to commit node\n", bytes);
+   // printf("Size of node is %ld\n", sizeof(node));
     return bytes;
     
 }

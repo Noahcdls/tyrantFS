@@ -172,14 +172,16 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
                 uint8_t name_slot[NAME_BOUNDARY];
                 bzero(name_slot, NAME_BOUNDARY);
                 write_block(name_slot, block, j, NAME_BOUNDARY);                         // remove old entry
+		printf("\n\nRemoved inode %lx from address %lx\n\n", cur_node, j+NAME_BOUNDARY-ADDR_LENGTH);
                 uint64_t last_block = get_i_block(&parent_node, parent_node.blocks - 1); // get last block for last entry
                 if (last_block == 0)
                     return -1;
                 if (j + i * BLOCKSIZE != parent_node.size - NAME_BOUNDARY)
                 {                                                                                                    // not the last slot so we need to refill the space
                     read_block(entry_data, last_block, parent_node.size % BLOCKSIZE - NAME_BOUNDARY, NAME_BOUNDARY); // copy data over into buffer
-                    write_block(entry_data, block, j, ADDR_LENGTH);                                                  // fill in empty slot
-                }
+                    write_block(entry_data, block, j, NAME_BOUNDARY);                                                  // fill in empty slot
+                    write_block(name_slot, last_block, parent_node.size % BLOCKSIZE - NAME_BOUNDARY, NAME_BOUNDARY);//remove last slot
+		}
                 parent_node.size -= NAME_BOUNDARY;
                 if (parent_node.size % BLOCKSIZE == 0)
                 { // have cleared an entire block and need to deallocate
@@ -215,17 +217,18 @@ int sub_unlink(uint64_t parent, uint64_t child)
     child_node.links -= 1;
     uint64_t block = 0;
     uint64_t tmp = 0;
+    uint64_t total_blocks = child_node.blocks;
     // if links count is 0, remove the file/directory
     if (child_node.links == 0)
     {
         // if it is a directory, unlink everything in it before freeing block
         if ((child_node.mode & S_IFMT) == S_IFDIR)
         {
-            for (uint64_t i = child_node.blocks; i > 0; i--)
+            for (uint64_t i = total_blocks; i > 0; i--)
             {
                 block = get_i_block(&child_node, i-1);
                 // unlink each entry (children dir or nod) in the block
-                for (int j = (i == child_node.blocks) ? child_node.size % BLOCKSIZE : BLOCKSIZE; j > 0; j -= NAME_BOUNDARY)
+                for (int j = (i == total_blocks) ? child_node.size % BLOCKSIZE : BLOCKSIZE; j > 0; j -= NAME_BOUNDARY)
                 {
                     // get the address of the inode?
                     // char temp[NAME_BOUNDARY - ADDR_LENGTH];
@@ -242,7 +245,7 @@ int sub_unlink(uint64_t parent, uint64_t child)
         else
         {
             // free all blocks that belong to this inode
-            for (uint64_t i = child_node.blocks; i > 0; i--)
+            for (uint64_t i = total_blocks; i > 0; i--)
             {
                 block = get_i_block(&child_node, i-1);
                 free_block(drive, block);
@@ -371,7 +374,7 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
         {                                                             // no name so can write over
             printf("Writing name %s\n", temp);
             write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH); // write name
-            printf("\n\nWriting address %ld at location %ld\n\n", addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
+            printf("\n\nWriting %s's address %ld at location %lx\n\n", name, addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
             write_block(&addr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
             printf("\n\n%ld added as address\n\n", addr);
             parent_node.size += NAME_BOUNDARY;
@@ -606,9 +609,9 @@ uint64_t find_path_node(char *path)
             }
 
             int64_t sought_to = lseek(drive, cur_node->direct_blocks[i], SEEK_SET);
-            printf("Sought to %ld to look for inode\n", sought_to);
+            //printf("Sought to %ld to look for inode\n", sought_to);
             int64_t bytes = read(drive, tmp_block, BLOCKSIZE);
-            printf("Wrote %ld bytes into temp block\n", bytes);
+            //printf("Wrote %ld bytes into temp block\n", bytes);
             tmp_node = check_block(tmp_block, node_name); // check block for addresses
             block_cnt--;
             if (tmp_node != 0) // found the next inode

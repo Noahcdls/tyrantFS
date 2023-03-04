@@ -10,6 +10,7 @@
 #include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <time.h>
+#include <ctype.h>
 
 uint8_t *memspace = NULL;
 /*
@@ -37,7 +38,8 @@ int tfs_mkdir(const char *path, mode_t m)
     }
 
     temp[i] = 0; // terminate at / for full path
-
+    if(isalnum(*(temp + i + 1)) == 0)
+	    return -EBADF;
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else
@@ -117,7 +119,8 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     }
 
     temp[i] = 0; // terminate at / for full path
-
+    if(isalnum(*(temp + i +1)) == 0)
+	    return -EBADF;
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else
@@ -142,6 +145,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     // what mode_t means
     // dev_t is device ID
     data_node.mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
+    printf("\n\nStarting data node with mode %x\n\n", data_node.mode);
     data_node.links = 1;
     data_node.blocks = 0;
     data_node.size = 0;
@@ -238,6 +242,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
     }
     if (flags & cur_node.mode)
     {
+	printf("Permissions of open: %x\n", flags & cur_node.mode);
         // fi->fh = &cur_node; // fh is a uint64_t that can be used to store data during open or release
         // fh gets called when reading and writing so very useful to store inode address here
         return 0;
@@ -424,7 +429,7 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
     commit_inode(&cur_node, cur); // commit timestamps
     if (size + offset > total_bytes)
     { // add new blocks if we dont have enough for write
-        uint64_t final_blocks = (size + offset) / BLOCKSIZE + ((size + offset) % BLOCKSIZE == 0 ? 0 : 1);
+        uint64_t final_blocks = (size + offset) / BLOCKSIZE + (((size + offset) % BLOCKSIZE) == 0 ? 0 : 1);
         for (uint64_t i = total_blocks; i < final_blocks; i++)
         {
             block = add_block_to_node(&cur_node, cur);
@@ -462,15 +467,16 @@ int tfs_truncate(const char *path, off_t length)
         return 0;
     uint64_t block_no = length / BLOCKSIZE;
     uint64_t block = get_i_block(&cur_node, block_no);
-    for (uint32_t i = block_no + 1; i < cur_node.blocks; i++)
+    uint64_t total_blocks = cur_node.blocks;
+    for (uint32_t i = block_no+1; i < total_blocks; i++)
     {
         block = get_i_block(&cur_node, i);
         free_block(drive, block);
+	cur_node.blocks--;
     }
     cur_node.change_time = get_current_time_in_nsec();
     cur_node.data_time = cur_node.change_time;
     cur_node.size = length;
-    cur_node.blocks = cur_node.blocks - (block_no + 1);
     commit_inode(&cur_node, cur);
     return 0;
 }
@@ -484,7 +490,7 @@ int tfs_getattr(const char * path, struct stat * st){
         return -ENOENT;
     }
     node cur_node;
-    memset(&cur_node, 0, sizeof(node));
+   // memset(&cur_node, 0, sizeof(node));
     fetch_inode(cur, &cur_node);
     memset(st, 0, sizeof(struct stat));
 
@@ -508,6 +514,7 @@ int tfs_getattr(const char * path, struct stat * st){
 
 int tfs_flush(const char *path, struct fuse_file_info *fi)
 {
+   // return syncfs(drive);
     return 0; // we already write back data on write so we are good to leave flush alone. Flush should be used if we want to log our data or send it somewhere else too
 }
 
