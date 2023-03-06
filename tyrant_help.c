@@ -181,7 +181,7 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
                     read_block(entry_data, last_block, parent_node.size % BLOCKSIZE - NAME_BOUNDARY, NAME_BOUNDARY); // copy data over into buffer
                     write_block(entry_data, block, j, NAME_BOUNDARY);                                                  // fill in empty slot
                     write_block(name_slot, last_block, parent_node.size % BLOCKSIZE - NAME_BOUNDARY, NAME_BOUNDARY);//remove last slot
-		}
+		        }
                 parent_node.size -= NAME_BOUNDARY;
                 if (parent_node.size % BLOCKSIZE == 0)
                 { // have cleared an entire block and need to deallocate
@@ -196,72 +196,6 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
         }
     }
     return -1;
-}
-
-int sub_unlink(uint64_t parent, uint64_t child)
-{
-	printf("Performing sub unlink\n");
-    // remove link from its parent
-    if (parent == 0 || child == 0)
-        return -1;
-    int status = remove_link_from_parent(parent, child);
-    if (status == -1)
-    {
-        // something is wrong, as we cannot find child from parent
-        return -1;
-    }
-    node parent_node, child_node;
-    fetch_inode(parent, &parent_node);
-    fetch_inode(child, &child_node);
-    // Update links count
-    child_node.links -= 1;
-    uint64_t block = 0;
-    uint64_t tmp = 0;
-    uint64_t total_blocks = child_node.blocks;
-    // if links count is 0, remove the file/directory
-    if (child_node.links == 0)
-    {
-        // if it is a directory, unlink everything in it before freeing block
-        if ((child_node.mode & S_IFDIR) == S_IFDIR)
-        {
-            for (uint64_t i = total_blocks; i > 0; i--)
-            {
-                block = get_i_block(&child_node, i-1);
-                // unlink each entry (children dir or nod) in the block
-                for (int j = (i == total_blocks) ? child_node.size % BLOCKSIZE : BLOCKSIZE; j > 0; j -= NAME_BOUNDARY)
-                {
-                    // get the address of the inode?
-                    // char temp[NAME_BOUNDARY - ADDR_LENGTH];
-                    if((i-1)*BLOCKSIZE+j-NAME_BOUNDARY == NAME_BOUNDARY || (i-1)*BLOCKSIZE+j-NAME_BOUNDARY == 0)
-                        continue;//no need to unlink . or ..
-                    read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
-                    // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
-
-                    sub_unlink(child, tmp);
-                }
-
-                // put the whole block back to free list
-                free_block(drive, block-1);
-            }
-        }
-        else
-        {
-            // free all blocks that belong to this inode
-            for (uint64_t i = total_blocks; i > 0; i--)
-            {
-                block = get_i_block(&child_node, i-1);
-                free_block(drive, block);
-            }
-        }
-
-        // free the inode
-        free_inode(child);
-    }
-    else
-    {
-        commit_inode(&child_node, child);
-    }
-    return 0;
 }
 
 /// @brief Get the ith block of an inode

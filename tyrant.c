@@ -81,7 +81,7 @@ int tfs_mkdir(const char *path, mode_t m)
     dir_node.mode |= S_IFDIR;
     dir_node.direct_blocks[0] = block;
     dir_node.blocks = 1;
-    dir_node.links = 1;
+    dir_node.links = 0;
     write_block(".", block, 0, sizeof("."));
     write_block(&dir, block, MAX_NAME_LENGTH, ADDR_LENGTH);
 
@@ -146,7 +146,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     // dev_t is device ID
     data_node.mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
     printf("\n\nStarting data node with mode %x\n\n", data_node.mode);
-    data_node.links = 1;
+    data_node.links = 0;
     data_node.blocks = 0;
     data_node.size = 0;
     data_node.creation_time = get_current_time_in_nsec();
@@ -319,39 +319,12 @@ int tfs_unlink(const char *path)
     // if links count is 0, remove the file/directory
     if (cur_node.links == 0)
     {
-        // if it is a directory, unlink everything in it before freeing block
-        if ((cur_node.mode & S_IFDIR) == S_IFDIR)
+        // free all blocks that belong to this inode
+        for (int i = 0; i < cur_node.blocks; i++)
         {
-            for (uint64_t i = total_blocks; i > 0; i--)
-            {
-                block = get_i_block(&cur_node, i-1);
-                // unlink each entry (children dir or nod) in the block
-                for (int j = (i == total_blocks) ? cur_node.size % BLOCKSIZE : BLOCKSIZE; j > 0; j -= NAME_BOUNDARY)
-                {
-                    // get the address of the inode?
-                    // char temp[NAME_BOUNDARY - ADDR_LENGTH];
-                    if((i-1)*BLOCKSIZE+j-NAME_BOUNDARY == NAME_BOUNDARY || (i-1)*BLOCKSIZE+j-NAME_BOUNDARY == 0)
-                        continue;//no need to unlink . or ..
-                    read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
-                    // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
-
-                    sub_unlink(cur, tmp);
-                }
-
-                // put the whole block back to free list
-                free_block(drive, block-1);
-            }
+            uint64_t block = get_i_block(&cur_node, i);
+            free_block(drive, block);
         }
-        else
-        {
-            // free all blocks that belong to this inode
-            for (int i = 0; i < cur_node.blocks; i++)
-            {
-                uint64_t block = get_i_block(&cur_node, i);
-                free_block(drive, block);
-            }
-        }
-
         // free the inode
         free_inode(cur);
     }
