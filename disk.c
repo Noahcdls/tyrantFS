@@ -143,14 +143,17 @@ uint64_t allocate_inode(int fd)
 @param inode Pointer to the inode that is to be freed
 @return 0 for proper return, -1 for error
 */
-int free_inode(uint64_t inode)
+int free_inode(uint64_t cur_node)
 {
-    if (inode == 0)
+    if (cur_node == 0)
         return -1;
     uint8_t buff[INODE_SIZE_BOUNDARY];
     bzero(buff, INODE_SIZE_BOUNDARY);
-    lseek(drive, inode, SEEK_SET);
+    lseek(drive, cur_node, SEEK_SET);
     write(drive, buff, INODE_SIZE_BOUNDARY);
+    node cur;
+    fetch_inode(cur_node, &cur);
+    printf("FREED: Mode = %x\n", cur.mode);
     return 0;
 }
 

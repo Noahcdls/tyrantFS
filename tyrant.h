@@ -18,3 +18,5 @@ int tfs_write(const char *path, const char * buff, size_t size, off_t offset,
               struct fuse_file_info *fi);
 int tfs_truncate(const char * path, off_t length);
 int tfs_unlink(const char *path);
+int tfs_rmdir(const char * path);
+int tfs_utime(const char *path, struct utimbuf *tv);

@@ -81,7 +81,7 @@ int tfs_mkdir(const char *path, mode_t m)
     dir_node.mode |= S_IFDIR;
     dir_node.direct_blocks[0] = block;
     dir_node.blocks = 1;
-    dir_node.links = 1;
+    dir_node.links = 0;
     write_block(".", block, 0, sizeof("."));
     write_block(&dir, block, MAX_NAME_LENGTH, ADDR_LENGTH);
 
@@ -146,7 +146,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     // dev_t is device ID
     data_node.mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
     printf("\n\nStarting data node with mode %x\n\n", data_node.mode);
-    data_node.links = 1;
+    data_node.links = 0;
     data_node.blocks = 0;
     data_node.size = 0;
     data_node.creation_time = get_current_time_in_nsec();
@@ -317,6 +317,7 @@ int tfs_unlink(const char *path)
     uint64_t tmp = 0;
     uint64_t total_blocks = cur_node.blocks;
     // if links count is 0, remove the file/directory
+    printf("Current links: %d\n", cur_node.links);
     if (cur_node.links == 0)
     {
         // if it is a directory, unlink everything in it before freeing block
@@ -353,12 +354,14 @@ int tfs_unlink(const char *path)
         }
 
         // free the inode
+	printf("Freeing child inode");
         free_inode(cur);
     }
     else
     {
         commit_inode(&cur_node, cur);
     }
+    printf("Done unlinking\n");
     return 0;
 }
 
@@ -503,8 +506,8 @@ int tfs_getattr(const char * path, struct stat * st){
 
     st->st_ino = (uint64_t)(cur - BLOCKSIZE)/INODE_SIZE_BOUNDARY;
     st->st_mode = cur_node.mode;
-    printf("cur node is DIR? %x %x\n", (cur_node.mode), S_IFDIR);
-    printf("IS DIR? %x\n", (st->st_mode & S_IFDIR)); 
+    //printf("cur node is DIR? %x %x\n", (cur_node.mode), S_IFDIR);
+    //printf("IS DIR? %x\n", (st->st_mode & S_IFDIR)); 
     st->st_nlink = cur_node.links;
     st->st_size = cur_node.size;
     st->st_blocks = cur_node.blocks;
