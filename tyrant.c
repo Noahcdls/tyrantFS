@@ -313,30 +313,33 @@ int tfs_unlink(const char *path)
     cur_node.links -= 1;
     cur_node.change_time = get_current_time_in_nsec();
     commit_inode(&cur_node, cur);
+    uint64_t block = 0;
     uint64_t tmp = 0;
-
+    uint64_t total_blocks = cur_node.blocks;
     // if links count is 0, remove the file/directory
     if (cur_node.links == 0)
     {
         // if it is a directory, unlink everything in it before freeing block
-        if ((cur_node.mode & S_IFMT) == S_IFDIR)
+        if ((cur_node.mode & S_IFDIR) == S_IFDIR)
         {
-            for (int i = 0; i < cur_node.blocks; i++)
+            for (uint64_t i = total_blocks; i > 0; i--)
             {
-                uint64_t block = get_i_block(&cur_node, i);
+                block = get_i_block(&cur_node, i-1);
                 // unlink each entry (children dir or nod) in the block
-                for (int j = 0; j < BLOCKSIZE && j + i * BLOCKSIZE < cur_node.size; j += NAME_BOUNDARY)
+                for (int j = (i == total_blocks) ? cur_node.size % BLOCKSIZE : BLOCKSIZE; j > 0; j -= NAME_BOUNDARY)
                 {
                     // get the address of the inode?
                     // char temp[NAME_BOUNDARY - ADDR_LENGTH];
+                    if((i-1)*BLOCKSIZE+j-NAME_BOUNDARY == NAME_BOUNDARY || (i-1)*BLOCKSIZE+j-NAME_BOUNDARY == 0)
+                        continue;//no need to unlink . or ..
+                    read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
                     // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
-                    // tfs_unlink(temp);
-                    read_block(&tmp, block, PATH_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH);
-                    sub_unlink(cur, tmp); // dont need to call tfs_unlink since we have the parent and child here. Saves time on traversal too
+
+                    sub_unlink(cur, tmp);
                 }
 
                 // put the whole block back to free list
-                free_block(drive, block);
+                free_block(drive, block-1);
             }
         }
         else
@@ -357,6 +360,10 @@ int tfs_unlink(const char *path)
         commit_inode(&cur_node, cur);
     }
     return 0;
+}
+
+int tfs_rmdir(const char * path){
+    return tfs_unlink(path);
 }
 
 /// @brief read a file's data with given size and offset
@@ -512,6 +519,21 @@ int tfs_getattr(const char * path, struct stat * st){
     return 0;
 }
 
+int tfs_utime(const char *path, struct utimbuf *tv){
+    uint64_t cur = find_path_node((char *)path);
+    if(cur == 0){
+        printf("%s NOT FOUND\n\n", path);
+        return -ENOENT;
+    }
+
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    cur_node.access_time = tv->actime;
+    cur_node.change_time = tv->modtime;
+    commit_inode(&cur_node, cur);
+    return 0;   
+}
+
 int tfs_flush(const char *path, struct fuse_file_info *fi)
 {
    // return syncfs(drive);
@@ -523,6 +545,8 @@ static const struct fuse_operations operations = {
     .mknod = &tfs_mknod,
     .getattr = &tfs_getattr,
     .readdir = &tfs_readdir,
+    .rmdir = &tfs_rmdir,
+    .utime = &tfs_utime,
     // .rmdir = tfs_rmdir,
     .open = &tfs_open,
     .flush = &tfs_flush, // close() operation stuff. Pretty much finish writing data if you havent yet and have it stored somewhere

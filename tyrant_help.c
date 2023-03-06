@@ -222,7 +222,7 @@ int sub_unlink(uint64_t parent, uint64_t child)
     if (child_node.links == 0)
     {
         // if it is a directory, unlink everything in it before freeing block
-        if ((child_node.mode & S_IFMT) == S_IFDIR)
+        if ((child_node.mode & S_IFDIR) == S_IFDIR)
         {
             for (uint64_t i = total_blocks; i > 0; i--)
             {
@@ -232,6 +232,8 @@ int sub_unlink(uint64_t parent, uint64_t child)
                 {
                     // get the address of the inode?
                     // char temp[NAME_BOUNDARY - ADDR_LENGTH];
+                    if((i-1)*BLOCKSIZE+j-NAME_BOUNDARY == NAME_BOUNDARY || (i-1)*BLOCKSIZE+j-NAME_BOUNDARY == 0)
+                        continue;//no need to unlink . or ..
                     read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
                     // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
 
