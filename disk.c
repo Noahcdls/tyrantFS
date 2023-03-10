@@ -88,15 +88,15 @@ int tfs_mkfs(int fd)
     char path1[] = ".";
     char path2[] = "..";
     write_block(buff, block, 0, BLOCKSIZE);
-    write_block(path1, block, 0, sizeof(path1));           // 56 bytes for directory name
-    write_block(&root_node, block, 56, ADDR_LENGTH); // write root_node address
+    write_block(path1, block, 0, sizeof(path1));           // NAME_BOUNDARY - ADDR_LENGTH bytes for directory name
+    write_block(&root_node, block, NAME_BOUNDARY-ADDR_LENGTH, ADDR_LENGTH); // write root_node address
 
-    write_block(path2, block, 64, sizeof(path2));
-    write_block(&root_node, block, 64 * 2 - 8, ADDR_LENGTH); // write root_node address
+    write_block(path2, block, NAME_BOUNDARY, sizeof(path2));
+    write_block(&root_node, block, NAME_BOUNDARY * 2 - ADDR_LENGTH, ADDR_LENGTH); // write root_node address
 
-    read_block(buff, block, 56, ADDR_LENGTH);
+    read_block(buff, block, NAME_BOUNDARY-ADDR_LENGTH, ADDR_LENGTH);
     printf("Double checking . for root node that %ld == %ld\n", root_node,* (uint64_t*)buff);
-    read_block(buff, block, 64+56, ADDR_LENGTH);
+    read_block(buff, block, NAME_BOUNDARY+NAME_BOUNDARY-ADDR_LENGTH, ADDR_LENGTH);
     printf("Double checking .. for root node that %ld == %ld\n", root_node, *(uint64_t*)buff);
     temp_node.data_time = time(NULL);
     temp_node.size = NAME_BOUNDARY * 2;
@@ -506,9 +506,9 @@ void *fetch_inode(uint64_t my_node, void *buff)
 {
     if (my_node == 0)
         return NULL;
-    int64_t sought_to =  lseek(drive, my_node, SEEK_SET);
+   lseek(drive, my_node, SEEK_SET);
    // printf("Fetched inode at offset %ld\n", sought_to);
-    int64_t bytes = read(drive, buff, sizeof(node));
+   read(drive, buff, sizeof(node));
    // printf("Read %ld bytes to fetch inode\n", bytes);
    // printf("Size of node is %ld\n", sizeof(node));
     return buff;
@@ -516,9 +516,9 @@ void *fetch_inode(uint64_t my_node, void *buff)
 
 int commit_inode(node *my_node, uint64_t node_loc)
 {
-    int64_t sought_to = lseek(drive, node_loc, SEEK_SET);
+   lseek(drive, node_loc, SEEK_SET);
    // printf("Sought to %ld for committing node\n", sought_to);
-    int64_t bytes = write(drive, my_node, sizeof(node));
+   uint64_t bytes = write(drive, my_node, sizeof(node));
    // printf("Wrote %ld bytes to commit node\n", bytes);
    // printf("Size of node is %ld\n", sizeof(node));
     return bytes;

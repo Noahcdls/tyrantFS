@@ -55,7 +55,7 @@ extern uint64_t num_blocks;
 extern uint64_t inode_blocks;
 extern uint64_t data_blocks;
 extern int drive;
-#define NAME_BOUNDARY 64
+#define NAME_BOUNDARY 256
 
 
 int tfs_mkfs(int fd);
