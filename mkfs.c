@@ -564,7 +564,7 @@ static const struct fuse_operations operations = {
 
 int main(int argc, char **argv)
 {
-    if (argc < 3){
+    if (argc < 2){
 	printf("Not enough args. Add a directory path\n");
         return -1;
     }
@@ -574,7 +574,11 @@ int main(int argc, char **argv)
         printf("\n\nFailed to open %s\n\n", path);
         return fd;
         }
-    tfs_disk_info(fd);
-    printf("Starting up FUSE in %s\n", path);
-    return fuse_main(argc -1, argv, &operations);
+    int setup = tfs_mkfs(fd);
+    if (setup == -1){
+        printf("\n\nFailed to make file system\n\n");
+        return -1;
+    }
+    printf("%s has finished formatting with mkfs", path);
+    close(fd);
 }

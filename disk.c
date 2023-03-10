@@ -9,7 +9,7 @@
 #include <sys/mount.h>
 
 // node * root_node = NULL;
-uint64_t root_node;
+uint64_t root_node = BLOCKSIZE;
 
 int drive = -1; // field descriptor of drive we are working with
 uint64_t drivesize = 0;
@@ -106,6 +106,24 @@ int tfs_mkfs(int fd)
     fetch_inode(root_node, &temp_node);
     printf("double check mode %x\n", temp_node.mode);
     printf("Finished making FS\n");
+    return 0;
+}
+
+
+int tfs_disk_info(int fd)
+{
+    if (fd < 0)
+        return -1;
+    drive = fd;
+    // set up boundaries
+    uint8_t buff[BLOCKSIZE];
+    bzero(buff, BLOCKSIZE);
+    ioctl(fd, BLKGETSIZE64, &drivesize);
+    num_blocks = drivesize / BLOCKSIZE;
+    inode_blocks = num_blocks / 65; // following ext4 standard of 1 inode for every 16KB of data or 1 inode block for every 64 data blocks
+    data_blocks = inode_blocks * 64 - 1;//leave 1 for superblock
+    inode_byte_boundary = (inode_blocks + 1) * BLOCKSIZE;
+    printf("Drive is %.3f GB and has %ld blocks!\ninode blocks: %ld\ndata blocks: %ld\n\n", (float)drivesize/1024/1024/1024, num_blocks, inode_blocks, data_blocks);
     return 0;
 }
 

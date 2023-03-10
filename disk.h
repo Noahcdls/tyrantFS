@@ -59,6 +59,7 @@ extern int drive;
 
 
 int tfs_mkfs(int fd);
+int tfs_disk_info(int fd);
 uint64_t allocate_inode(int fd);
 int free_inode(uint64_t inode);
 int read_inode(uint64_t inode, void * buff);
