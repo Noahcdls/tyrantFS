@@ -3,6 +3,22 @@
         "stdio.h": "c",
         "fuse_common.h": "c",
         "fuse.h": "c",
-        "fuse_opt.h": "c"
+        "fuse_opt.h": "c",
+        "cmath": "c",
+        "*.tcc": "c",
+        "type_traits": "c",
+        "stdint.h": "c",
+        "stat.h": "c",
+        "tyrant.h": "c",
+        "limits": "c",
+        "select.h": "c",
+        "tyrant_help.h": "c",
+        "disk.h": "c",
+        "unistd.h": "c",
+        "time_t.h": "c",
+        "stdlib.h": "c",
+        "statvfs.h": "c",
+        "statfs.h": "c",
+        "mount.h": "c"
     }
 }

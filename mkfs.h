@@ -3,8 +3,8 @@
 #include <unistd.h>
 #include <string.h>
 #include "tyrant_help.h"
-#define MAX_NAME_LENGTH 256-8 // maximum name length of a file or directory
-#define PATH_BOUNDARY 256   // name + address of inode
+#define MAX_NAME_LENGTH 56 // maximum name length of a file or directory
+#define PATH_BOUNDARY 64   // name + address of inode
 
 int tfs_mknod(const char *path, mode_t m, dev_t d);
 int tfs_mkdir(const char *path, mode_t m);
