@@ -11,7 +11,8 @@
 #include <sys/mount.h>
 #include <time.h>
 #include <ctype.h>
-
+#include <sys/xattr.h>
+#include <utime.h>
 uint8_t *memspace = NULL;
 /*
 @brief make a directory path by allocating an inode and adding it to the directory list
@@ -21,7 +22,7 @@ uint8_t *memspace = NULL;
 */
 int tfs_mkdir(const char *path, mode_t m)
 {
-	printf("Starting mkdir\n");
+    printf("Starting mkdir\n");
     printf("CALLING MKDIR with path %s\n\n", path);
     node parent_node;
     uint64_t parent = 0;
@@ -38,8 +39,8 @@ int tfs_mkdir(const char *path, mode_t m)
     }
 
     temp[i] = 0; // terminate at / for full path
-    if(isalnum(*(temp + i + 1)) == 0)
-	    return -EBADF;
+    if (isalnum(*(temp + i + 1)) == 0)
+        return -EBADF;
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else
@@ -104,7 +105,7 @@ int tfs_mkdir(const char *path, mode_t m)
 
 int tfs_mknod(const char *path, mode_t m, dev_t d)
 {
-	printf("Startind mknod\n");
+    printf("Startind mknod\n");
     uint64_t parent = 0;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1)); // for us to hold path
 
@@ -119,8 +120,8 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     }
 
     temp[i] = 0; // terminate at / for full path
-    if(isalnum(*(temp + i +1)) == 0)
-	    return -EBADF;
+    if (isalnum(*(temp + i + 1)) == 0)
+        return -EBADF;
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else
@@ -154,7 +155,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     data_node.change_time = data_node.creation_time;
     data_node.data_time = data_node.creation_time;
     commit_inode(&data_node, data);
-    printf("Adding %s as part of path %s\n", temp+i+1, (char*)path);
+    printf("Adding %s as part of path %s\n", temp + i + 1, (char *)path);
     int result = add_to_directory(parent, data, (temp + i + 1));
     if (result != 0)
     {
@@ -176,7 +177,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
 /// @return 0 success, -1 failure
 int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-	printf("Starting readdir\n");
+    printf("Starting readdir\n");
 
     uint64_t dir_loc = find_path_node((char *)path);
     if (dir_loc == 0)
@@ -205,12 +206,12 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
             read_block(name, block, i, MAX_NAME_LENGTH);
             printf("%s\n", name);
             byte_count += PATH_BOUNDARY;
-            if (name[0] == '\0'){
+            if (name[0] == '\0')
+            {
                 printf("empty name\n");
                 continue;
-                }
+            }
             filler(buffer, name, NULL, 0);
-            
         }
         block_count++;
     }
@@ -219,7 +220,7 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
 
 int tfs_open(const char *path, struct fuse_file_info *fi)
 {
-	printf("Starting open\n");
+    printf("Starting open\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -242,7 +243,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
     }
     if (flags & cur_node.mode)
     {
-	printf("Permissions of open: %x\n", flags & cur_node.mode);
+        printf("Permissions of open: %x\n", flags & cur_node.mode);
         // fi->fh = &cur_node; // fh is a uint64_t that can be used to store data during open or release
         // fh gets called when reading and writing so very useful to store inode address here
         return 0;
@@ -255,7 +256,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
 /// @return 0 success, -1 failure
 int tfs_unlink(const char *path)
 {
-	printf("starting unlink\n");
+    printf("starting unlink\n");
     // first check if the pathname is valid
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
@@ -325,14 +326,14 @@ int tfs_unlink(const char *path)
         {
             for (uint64_t i = total_blocks; i > 0; i--)
             {
-                block = get_i_block(&cur_node, i-1);
+                block = get_i_block(&cur_node, i - 1);
                 // unlink each entry (children dir or nod) in the block
                 for (int j = (i == total_blocks) ? cur_node.size % BLOCKSIZE : BLOCKSIZE; j > 0; j -= NAME_BOUNDARY)
                 {
                     // get the address of the inode?
                     // char temp[NAME_BOUNDARY - ADDR_LENGTH];
-                    if((i-1)*BLOCKSIZE+j-NAME_BOUNDARY == NAME_BOUNDARY || (i-1)*BLOCKSIZE+j-NAME_BOUNDARY == 0)
-                        continue;//no need to unlink . or ..
+                    if ((i - 1) * BLOCKSIZE + j - NAME_BOUNDARY == NAME_BOUNDARY || (i - 1) * BLOCKSIZE + j - NAME_BOUNDARY == 0)
+                        continue; // no need to unlink . or ..
                     read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
                     // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
 
@@ -340,7 +341,7 @@ int tfs_unlink(const char *path)
                 }
 
                 // put the whole block back to free list
-                free_block(drive, block-1);
+                free_block(drive, block - 1);
             }
         }
         else
@@ -354,7 +355,7 @@ int tfs_unlink(const char *path)
         }
 
         // free the inode
-	printf("Freeing child inode");
+        printf("Freeing child inode");
         free_inode(cur);
     }
     else
@@ -365,7 +366,8 @@ int tfs_unlink(const char *path)
     return 0;
 }
 
-int tfs_rmdir(const char * path){
+int tfs_rmdir(const char *path)
+{
     return tfs_unlink(path);
 }
 
@@ -378,9 +380,9 @@ int tfs_rmdir(const char * path){
 /// @return amount of actually read data
 int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	printf("starting read\n");
+    printf("starting read\n");
     uint64_t cur = find_path_node((char *)path);
-    if (cur == 0)//
+    if (cur == 0) //
         return -ENOENT;
     node cur_node;
     fetch_inode(cur, &cur_node);
@@ -419,7 +421,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
 /// @return amount of actually written data
 int tfs_write(const char *path, const char *buff, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	printf("Starting write\n");
+    printf("Starting write\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -467,7 +469,7 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
 
 int tfs_truncate(const char *path, off_t length)
 {
-	printf("Starting truncate\n");
+    printf("Starting truncate\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -478,11 +480,11 @@ int tfs_truncate(const char *path, off_t length)
     uint64_t block_no = length / BLOCKSIZE;
     uint64_t block = get_i_block(&cur_node, block_no);
     uint64_t total_blocks = cur_node.blocks;
-    for (uint32_t i = block_no+1; i < total_blocks; i++)
+    for (uint32_t i = block_no + 1; i < total_blocks; i++)
     {
         block = get_i_block(&cur_node, i);
         free_block(drive, block);
-	cur_node.blocks--;
+        cur_node.blocks--;
     }
     cur_node.change_time = get_current_time_in_nsec();
     cur_node.data_time = cur_node.change_time;
@@ -491,23 +493,25 @@ int tfs_truncate(const char *path, off_t length)
     return 0;
 }
 
-int tfs_getattr(const char * path, struct stat * st){
+int tfs_getattr(const char *path, struct stat *st)
+{
     printf("getting attribute\n");
     uint64_t cur = find_path_node((char *)path);
     printf("Cur node location is %ld\n", cur);
-    if(cur == 0){
+    if (cur == 0)
+    {
         printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
     node cur_node;
-   // memset(&cur_node, 0, sizeof(node));
+    // memset(&cur_node, 0, sizeof(node));
     fetch_inode(cur, &cur_node);
     memset(st, 0, sizeof(struct stat));
 
-    st->st_ino = (uint64_t)(cur - BLOCKSIZE)/INODE_SIZE_BOUNDARY;
+    st->st_ino = (uint64_t)(cur - BLOCKSIZE) / INODE_SIZE_BOUNDARY;
     st->st_mode = cur_node.mode;
-    //printf("cur node is DIR? %x %x\n", (cur_node.mode), S_IFDIR);
-    //printf("IS DIR? %x\n", (st->st_mode & S_IFDIR)); 
+    // printf("cur node is DIR? %x %x\n", (cur_node.mode), S_IFDIR);
+    // printf("IS DIR? %x\n", (st->st_mode & S_IFDIR));
     st->st_nlink = cur_node.links;
     st->st_size = cur_node.size;
     st->st_blocks = cur_node.blocks;
@@ -518,13 +522,15 @@ int tfs_getattr(const char * path, struct stat * st){
     st->st_atime = (time_t)cur_node.access_time;
     st->st_mtime = (time_t)cur_node.data_time;
     st->st_ctime = (time_t)cur_node.change_time;
-    printf("Returning stat for %s\n", (char*)path);
+    printf("Returning stat for %s\n", (char *)path);
     return 0;
 }
 
-int tfs_utime(const char *path, struct utimbuf *tv){
+int tfs_utime(const char *path, struct utimbuf *tv)
+{
     uint64_t cur = find_path_node((char *)path);
-    if(cur == 0){
+    if (cur == 0)
+    {
         printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
@@ -534,14 +540,291 @@ int tfs_utime(const char *path, struct utimbuf *tv){
     cur_node.access_time = tv->actime;
     cur_node.change_time = tv->modtime;
     commit_inode(&cur_node, cur);
-    return 0;   
+    return 0;
 }
 
 int tfs_flush(const char *path, struct fuse_file_info *fi)
 {
-   // return syncfs(drive);
+    // return syncfs(drive);
     return 0; // we already write back data on write so we are good to leave flush alone. Flush should be used if we want to log our data or send it somewhere else too
 }
+
+int tfs_link(const char *old_path, const char *new_path)
+{
+
+    uint64_t cur = find_path_node((char *)new_path);
+    if (cur != 0) // new path shouldnt already exist
+        return -EEXIST;
+    cur = find_path_node((char *)old_path);
+    if (cur == 0) // get node from old path
+        return -ENOENT;
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    /////////////////////////////////////////
+    node parent_node;
+    uint64_t parent = 0;
+    char *temp = malloc(sizeof(char) * (strlen(old_path) + 1));
+
+    int i;
+    strcpy(temp, old_path);
+    for (i = strlen(old_path) - 1; temp[i] != '/' && i >= 0; i--)
+        ; // check for last / to differentiate parent path from new directory
+    if (i == -1)
+    {
+        free(temp);
+        return -1; // invalid path
+    }
+
+    temp[i] = 0; // terminate at / for full path
+    if (isalnum(*(temp + i + 1)) == 0)
+        return -EBADF;
+    if (i != 0) // '/' or root is the first byte
+        parent = find_path_node(temp);
+    else
+        parent = root_node;
+    if (parent == 0)
+    {
+        free(temp);
+        return -ENOENT;
+    }
+    fetch_inode(parent, &parent_node);
+
+    int result = add_to_directory(parent, cur, (char *)new_path);
+    if (result != 0)
+        return -1;
+    free(temp);
+    cur_node.links++;
+    commit_inode(&cur_node, cur);
+    return result;
+}
+
+#define ATTR_SIZE 128
+
+int tfs_listxattr(const char *path, char *list, size_t list_size)
+{
+    uint64_t cur = find_path_node((char *)path);
+    if (cur == 0)
+        return -ENOENT;
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    uint8_t block[BLOCKSIZE];
+    if (cur_node.list == 0)
+    {
+        return -1;
+    }
+    lseek(drive, cur_node.list, SEEK_SET);
+    read(drive, block, BLOCKSIZE);
+    uint64_t total_bytes = 0;
+    uint64_t byte_space = list_size;
+    char *name = block;
+    for (int i = 0; i < BLOCKSIZE; i += ATTR_SIZE)
+    {
+        name = block + i;
+        uint64_t name_len = strlen((const char *)name);
+
+        if (name_len == 0)
+            continue;
+        if (byte_space < name_len)
+            return total_bytes;
+        byte_space -= name_len + 1;
+        char name_cpy[ATTR_SIZE - ADDR_LENGTH];
+        bzero(name_cpy, ATTR_SIZE - ADDR_LENGTH);
+        strcpy(name_cpy, name);
+        memcpy(list, name_cpy, name_len + 1);
+        total_bytes += name_len + 1;
+    }
+    return total_bytes;
+}
+
+int tfs_setxattr(const char *path, const char *list_name, const void *value, size_t size, int flags)
+{
+    if (size > BLOCK_SIZE - 8)
+    {
+        printf("Size of attr is to large\n"); return -1;
+    }
+    uint64_t cur = find_path_node((char *)path);
+    if (cur == 0)
+        return -ENOENT;
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    uint8_t block[BLOCKSIZE];
+    bzero(block, BLOCKSIZE);
+    if (cur_node.list == 0)
+    {
+        uint64_t list_block = allocate_block(drive);
+        if (list_block == 0)
+            return -1;
+        write_block(block, list_block, 0, BLOCKSIZE);
+        cur_node.list = list_block;
+
+        commit_inode(&cur_node, cur);
+    }
+    lseek(drive, cur_node.list, SEEK_SET);
+    read(drive, block, BLOCKSIZE);
+    uint64_t total_bytes = 0;
+    uint64_t byte_space = size;
+    int found_empty = -1;
+    int found_name = -1;
+    char *name = block;
+    uint64_t namesize = strlen(list_name);
+    if(namesize >= ATTR_SIZE-ADDR_LENGTH)
+        namesize = ATTR_SIZE-ADDR_LENGTH-1;//last byte should always be left 0 for proper formatting so remove it from len
+    for (int i = 0; i < BLOCKSIZE; i += ATTR_SIZE)
+    {
+        name = block + i;
+        int name_len = strlen((const char *)name);
+        int name_match = strcmp((const char *)name, list_name);
+
+        if (name_len == 0 && (flags & XATTR_CREATE) && found_empty == -1)
+            found_empty = i;
+        if (name_match == 0 && (flags & XATTR_REPLACE) && found_name == -1)
+            found_name = i;
+    }
+    uint8_t clr_buff[BLOCKSIZE];
+    bzero(clr_buff, BLOCKSIZE);
+    switch (flags)
+    {
+    case XATTR_CREATE:
+        if (found_empty >= 0 && found_name == -1)
+        {
+            printf("CREATING DUE TO FLAG\n");
+            write_block(list_name, cur_node.list, found_empty, namesize);
+            uint64_t set_block = allocate_block(drive);
+            if (set_block == 0)
+                return -1;
+            write_block(clr_buff, set_block, 0, BLOCKSIZE);
+            write_block(&set_block, cur_node.list, found_empty + ATTR_SIZE - ADDR_LENGTH, ADDR_LENGTH);
+            write_block(&size, set_block, 0, 8);
+            write_block(value, set_block, 8, size);
+        }
+        else
+            return -1;
+        break;
+    case XATTR_REPLACE:
+        if (found_name >= 0)
+        {
+            printf("REPLACING DUE TO FLAG\n");
+            uint64_t set_block = *(uint64_t *)(block + found_name + ATTR_SIZE - ADDR_LENGTH);
+            write_block(clr_buff, set_block, 0, BLOCKSIZE);
+            write_block(&size, set_block, 0, 8);
+            write_block(value, set_block, 8, size);
+        }
+        else
+            return -1;
+        break;
+
+    default:
+        if (found_name >= 0)
+        {
+            printf("REPLACING ATTR\n");
+            uint64_t set_block = *(uint64_t *)(block + found_name + ATTR_SIZE - ADDR_LENGTH);
+            write_block(clr_buff, set_block, 0, BLOCKSIZE);
+            write_block(&size, set_block, 0, 8);
+            write_block(value, set_block, 8, size);            
+        }
+        else if (found_empty >= 0)
+        {
+            printf("CREATING ATTR\n");
+            write_block(list_name, cur_node.list, found_empty, namesize);
+            uint64_t set_block = allocate_block(drive);
+            if (set_block == 0)
+                return -1;
+            write_block(clr_buff, set_block, 0, BLOCKSIZE);
+            write_block(&set_block, cur_node.list, found_empty + ATTR_SIZE - ADDR_LENGTH, ADDR_LENGTH);
+            write_block(&size, set_block, 0, 8);
+            write_block(value, set_block, 8, size);            
+        }
+        else return -1;
+        break;
+    }
+    return 0;
+}
+
+int tfs_getxattr (const char * path, const char *list_name, char *value , size_t size){
+   uint64_t cur = find_path_node((char *)path);
+    if (cur == 0)
+        return -ENOENT;
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    uint8_t block[BLOCKSIZE];
+    if (cur_node.list == 0)
+    {
+        return -1;
+    }
+    lseek(drive, cur_node.list, SEEK_SET);
+    read(drive, block, BLOCKSIZE);
+    uint64_t total_bytes = 0;
+    uint64_t byte_space = size;
+    int found_name = -1;
+    char copy_list [ATTR_SIZE-ADDR_LENGTH];
+    memcpy(copy_list, list_name, ATTR_SIZE-ADDR_LENGTH);
+    copy_list[ATTR_SIZE-ADDR_LENGTH-1] = '\0';
+    char *name = block;
+    uint64_t namesize = strlen(list_name);
+    if(namesize >= ATTR_SIZE-ADDR_LENGTH)
+        namesize = ATTR_SIZE-ADDR_LENGTH-1;//last byte should always be left 0 for proper formatting so remove it from len
+    for (int i = 0; i < BLOCKSIZE; i += ATTR_SIZE)
+    {
+        name = block + i;
+        int name_match = strcmp((const char *)name, (const char *)copy_list);
+        if (name_match == 0 && found_name == -1){
+            found_name = i;
+            break;
+        }
+    }
+    uint64_t set_block = *(uint64_t *)(block + found_name + ATTR_SIZE - ADDR_LENGTH);
+    size_t value_size = 0;
+    read_block(&value_size, set_block, 0, 8);
+    if(size == 0){
+        return value_size;
+    }
+    read_block(value, set_block, 8, size);
+    return value_size;
+
+}
+
+int tfs_removexattr (const char * path, const char * list_name){
+   uint64_t cur = find_path_node((char *)path);
+    if (cur == 0)
+        return -ENOENT;
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    uint8_t block[BLOCKSIZE];
+    if (cur_node.list == 0)
+    {
+        return -1;
+    }
+    lseek(drive, cur_node.list, SEEK_SET);
+    read(drive, block, BLOCKSIZE);
+    uint64_t total_bytes = 0;
+    int found_name = -1;
+    char copy_list [ATTR_SIZE-ADDR_LENGTH];
+    memcpy(copy_list, list_name, ATTR_SIZE-ADDR_LENGTH);
+    copy_list[ATTR_SIZE-ADDR_LENGTH-1] = '\0';
+    char *name = block;
+    uint64_t namesize = strlen(list_name);
+    if(namesize >= ATTR_SIZE-ADDR_LENGTH)
+        namesize = ATTR_SIZE-ADDR_LENGTH-1;//last byte should always be left 0 for proper formatting so remove it from len
+    for (int i = 0; i < BLOCKSIZE; i += ATTR_SIZE)
+    {
+        name = block + i;
+        int name_match = strcmp((const char *)name, (const char *)copy_list);
+        if (name_match == 0 && found_name == -1){
+            printf("REMOVING XATTR\n");
+            found_name = i;
+            uint64_t set_block = *(uint64_t *)(block + found_name + ATTR_SIZE - ADDR_LENGTH);
+            free_block(drive, set_block);
+            uint8_t clr_buff[ATTR_SIZE];
+            bzero(clr_buff, ATTR_SIZE);
+            write_block(clr_buff, cur_node.list, i, ATTR_SIZE);
+            return 0;
+            break;
+        }
+    }
+    return -1;
+}
+
+
 
 static const struct fuse_operations operations = {
     .mkdir = &tfs_mkdir,
@@ -550,7 +833,6 @@ static const struct fuse_operations operations = {
     .readdir = &tfs_readdir,
     .rmdir = &tfs_rmdir,
     .utime = &tfs_utime,
-    // .rmdir = tfs_rmdir,
     .open = &tfs_open,
     .flush = &tfs_flush, // close() operation stuff. Pretty much finish writing data if you havent yet and have it stored somewhere
     .read = &tfs_read,
@@ -558,23 +840,29 @@ static const struct fuse_operations operations = {
     .truncate = &tfs_truncate,
     // .create = tfs_create,
     // .rename = tfs_rename
-    .unlink = &tfs_unlink
+    .unlink = &tfs_unlink,
+    .listxattr = &tfs_listxattr,
+    .setxattr = &tfs_setxattr,
+    .getxattr = &tfs_getxattr,
+    .removexattr = &tfs_removexattr
 
 };
 
 int main(int argc, char **argv)
 {
-    if (argc < 3){
-	printf("Not enough args. Add a directory path\n");
+    if (argc < 3)
+    {
+        printf("Not enough args. Add a directory path\n");
         return -1;
     }
-    char * path = argv[argc-1];
+    char *path = argv[argc - 1];
     int fd = open(path, O_RDWR, 0666);
-    if (fd < 0){
+    if (fd < 0)
+    {
         printf("\n\nFailed to open %s\n\n", path);
         return fd;
-        }
+    }
     tfs_disk_info(fd);
     printf("Starting up FUSE in %s\n", path);
-    return fuse_main(argc -1, argv, &operations);
+    return fuse_main(argc - 1, argv, &operations);
 }

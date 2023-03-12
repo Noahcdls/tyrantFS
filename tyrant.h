@@ -20,3 +20,6 @@ int tfs_truncate(const char * path, off_t length);
 int tfs_unlink(const char *path);
 int tfs_rmdir(const char * path);
 int tfs_utime(const char *path, struct utimbuf *tv);
+int tfs_removexattr (const char * path, const char * list_name);
+int tfs_getxattr (const char * path, const char *list_name, char *value , size_t size);
+int tfs_setxattr(const char *path, const char *list_name, const void *value, size_t size, int flags);

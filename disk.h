@@ -32,6 +32,7 @@ struct inode{
     uint64_t trpl_indirect;//holds block positions for blocks
     uint32_t flags;
     uint32_t checksum;
+    uint64_t list;
     
 
 };
