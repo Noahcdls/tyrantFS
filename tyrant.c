@@ -39,8 +39,8 @@ int tfs_mkdir(const char *path, mode_t m)
     }
 
     temp[i] = 0; // terminate at / for full path
-    if (isalnum(*(temp + i + 1)) == 0)
-        return -EBADF;
+    /*if (isalnum(*(temp + i + 1)) == 0)
+        return -EBADF;*/
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else
@@ -74,6 +74,8 @@ int tfs_mkdir(const char *path, mode_t m)
     write_block(block_data, block, 0, BLOCKSIZE); // clear directory block
     // https://jameshfisher.com/2017/02/24/what-is-mode_t/
     // what mode_t means
+    dir_node.user_id = geteuid();
+    dir_node.group_id = getegid();
     dir_node.creation_time = get_current_time_in_nsec();
     dir_node.access_time = dir_node.creation_time;
     dir_node.change_time = dir_node.creation_time;
@@ -120,8 +122,8 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     }
 
     temp[i] = 0; // terminate at / for full path
-    if (isalnum(*(temp + i + 1)) == 0)
-        return -EBADF;
+   /* if (isalnum(*(temp + i + 1)) == 0)
+        return -EBADF;*/
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else
@@ -150,6 +152,8 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     data_node.links = 0;
     data_node.blocks = 0;
     data_node.size = 0;
+    data_node.user_id = geteuid();
+    data_node.group_id = getegid();
     data_node.creation_time = get_current_time_in_nsec();
     data_node.access_time = data_node.creation_time;
     data_node.change_time = data_node.creation_time;
@@ -742,14 +746,15 @@ int tfs_setxattr(const char *path, const char *list_name, const void *value, siz
 
 int tfs_getxattr (const char * path, const char *list_name, char *value , size_t size){
    uint64_t cur = find_path_node((char *)path);
-    if (cur == 0)
-        return -ENOENT;
+    if (cur == 0){
+	printf("No entry\n");
+        return -ENOENT;}
     node cur_node;
     fetch_inode(cur, &cur_node);
     uint8_t block[BLOCKSIZE];
     if (cur_node.list == 0)
     {
-        return -1;
+        return 0;
     }
     lseek(drive, cur_node.list, SEEK_SET);
     read(drive, block, BLOCKSIZE);
@@ -824,7 +829,52 @@ int tfs_removexattr (const char * path, const char * list_name){
     return -1;
 }
 
+int tfs_rename(char * path, char * new_name, int flags){
+    uint64_t cur = find_path_node((char *)path);
+    if (cur == 0)
+    {
+        return -ENOENT;
+    }
+    node cur_node;
+    fetch_inode(cur, &cur_node);
 
+    // cannot remove root
+    if (strcmp(path, "/") == 0)
+    { // if root, return -1 (operation not permitted)
+        return -1;
+    }
+
+    /////////////////////// start parent search
+    uint64_t parent = 0;
+    char *temp = malloc(sizeof(char) * (strlen(path) + 1));
+
+    int i;
+    strcpy(temp, path);
+    for (i = strlen(path) - 1; temp[i] != '/' && i >= 0; i--)
+        ; // check for last / to differentiate parent path from new directory
+    if (i == -1)
+    {
+        free(temp);
+        return -1; // invalid path
+    }
+
+    temp[i] = 0; // terminate at / for full path
+
+    if (i != 0) // '/' or root is the first byte
+        parent = find_path_node(temp);
+    else
+        parent = root_node;
+    if (parent == 0)
+    {
+        free(temp);
+        return -1;
+    }
+    node parent_node;
+    return rename_from_parent(parent, cur, (char *) new_name);
+
+
+
+}
 
 static const struct fuse_operations operations = {
     .mkdir = &tfs_mkdir,
@@ -844,7 +894,8 @@ static const struct fuse_operations operations = {
     .listxattr = &tfs_listxattr,
     .setxattr = &tfs_setxattr,
     .getxattr = &tfs_getxattr,
-    .removexattr = &tfs_removexattr
+    .removexattr = &tfs_removexattr,
+    .rename = *tfs_rename
 
 };
 
