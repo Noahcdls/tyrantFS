@@ -50,11 +50,13 @@ typedef struct inode node;
 
 
 // extern node * root_node;
+
 extern uint64_t root_node;//offset to root
 extern uint64_t drivesize;
 extern uint64_t num_blocks;
 extern uint64_t inode_blocks;
 extern uint64_t data_blocks;
+extern uint64_t symlink;
 extern int drive;
 #define NAME_BOUNDARY 256
 
