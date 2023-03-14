@@ -77,6 +77,8 @@ int tfs_mkdir(const char *path, mode_t m)
     dir_node.access_time = dir_node.creation_time;
     dir_node.change_time = dir_node.creation_time;
     dir_node.data_time = dir_node.creation_time;
+    dir_node.user_id = geteuid();
+    dir_node.group_id = getegid();
     dir_node.mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
     dir_node.mode |= S_IFDIR;
     dir_node.direct_blocks[0] = block;
@@ -149,6 +151,9 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     data_node.links = 0;
     data_node.blocks = 0;
     data_node.size = 0;
+    data_node.user_id = geteuid();
+    data_node.group_id = getegid();
+
     data_node.creation_time = get_current_time_in_nsec();
     data_node.access_time = data_node.creation_time;
     data_node.change_time = data_node.creation_time;
@@ -543,6 +548,99 @@ int tfs_flush(const char *path, struct fuse_file_info *fi)
     return 0; // we already write back data on write so we are good to leave flush alone. Flush should be used if we want to log our data or send it somewhere else too
 }
 
+int tfs_chmod(const char * path, mode_t m){
+    uint64_t cur = find_path_node((char *)path);
+    if(cur == 0){
+        printf("%s NOT FOUND\n\n", path);
+        return -ENOENT;
+    }
+
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    cur_node.mode = m;
+    commit_inode(&cur_node, cur);
+    return 0;
+}
+
+
+int tfs_chown(const char * path, uid_t owner, gid_t group){
+    uint64_t cur = find_path_node((char *)path);
+    if(cur == 0){
+        printf("%s NOT FOUND\n\n", path);
+        return -ENOENT;
+    }
+
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+    cur_node.user_id = owner;
+    cur_node.group_id = group;
+    commit_inode(&cur_node, cur);
+    return 0;
+}	
+
+int tfs_rename(const char * path, const char * new_name){
+    uint64_t cur = find_path_node((char *)path);
+    if (cur == 0)
+    {
+        return -ENOENT;
+    }
+    node cur_node;
+    fetch_inode(cur, &cur_node);
+
+    // cannot remove root
+    if (strcmp(path, "/") == 0)
+    { // if root, return -1 (operation not permitted)
+        return -1;
+    }
+
+    /////////////////////// start parent search
+    uint64_t parent = 0;
+    char *temp = malloc(sizeof(char) * (strlen(path) + 1));
+
+    int i;
+    strcpy(temp, path);
+    for (i = strlen(path) - 1; temp[i] != '/' && i >= 0; i--)
+        ; // check for last / to differentiate parent path from new directory
+    if (i == -1)
+    {
+        free(temp);
+        return -1; // invalid path
+    }
+
+    temp[i] = 0; // terminate at / for full path
+
+    if (i != 0) // '/' or root is the first byte
+        parent = find_path_node(temp);
+    else
+        parent = root_node;
+    if (parent == 0)
+    {
+        free(temp);
+        return -1;
+    }
+    free(temp);
+
+    char *temp2 = malloc(sizeof(char) * (strlen(new_name) + 1));
+    strcpy(temp2, new_name);
+    for (i = strlen(new_name) - 1; temp2[i] != '/' && i >= 0; i--)
+        ; // check for last / to differentiate parent path from new directory
+    if (i == -1)
+    {
+        free(temp2);
+        return -1; // invalid path
+    }
+
+    temp2[i] = 0; // terminate at / for full path
+
+
+
+
+    return rename_from_parent(parent, cur, (char *) new_name+i+1);
+
+
+
+}
+
 static const struct fuse_operations operations = {
     .mkdir = &tfs_mkdir,
     .mknod = &tfs_mknod,
@@ -556,6 +654,9 @@ static const struct fuse_operations operations = {
     .read = &tfs_read,
     .write = &tfs_write,
     .truncate = &tfs_truncate,
+    .chmod = &tfs_chmod,
+    .chown = &tfs_chown,
+    .rename = &tfs_rename,
     // .create = tfs_create,
     // .rename = tfs_rename
     .unlink = &tfs_unlink

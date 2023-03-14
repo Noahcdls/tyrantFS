@@ -686,6 +686,47 @@ uint64_t find_path_node(char *path)
     return tmp_node;
 }
 
+int rename_from_parent(uint64_t parent, uint64_t cur_node, char* new_name)
+{
+	printf("Removing link from parent\n");
+    if (parent == 0)
+        return -1;
+    if (cur_node == 0)
+        return -1;
+    uint64_t child = 0;
+    uint64_t block = 0;
+    uint8_t entry_data[NAME_BOUNDARY];
+    node parent_node;
+    fetch_inode(parent, &parent_node);
+
+    for (int i = 0; i < parent_node.blocks; i++)
+    {
+        block = get_i_block(&parent_node, i);
+        if (block == 0)
+            return -1;
+        for (int j = 0; j < BLOCKSIZE && j + i * BLOCKSIZE < parent_node.size; j += NAME_BOUNDARY)
+        {
+            read_block(&child, block, j + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH);
+            if (child == cur_node)
+            {
+                uint8_t name_slot[NAME_BOUNDARY-ADDR_LENGTH];
+                bzero(name_slot, NAME_BOUNDARY-ADDR_LENGTH);
+                write_block(name_slot, block, j, NAME_BOUNDARY-ADDR_LENGTH);                        	  
+		uint64_t name_size = strlen((const char *) new_name);
+		if(name_size >= NAME_BOUNDARY-ADDR_LENGTH)
+			name_size = NAME_BOUNDARY-ADDR_LENGTH;
+		write_block(new_name, block, j, name_size);
+		read_block(name_slot, block, j, NAME_BOUNDARY-ADDR_LENGTH);
+		printf("RENAMED SLOT %s\n\n", name_slot);
+                parent_node.data_time = get_current_time_in_nsec();
+                parent_node.change_time = parent_node.data_time;
+                commit_inode(&parent_node, parent);
+                return 0;
+            }
+        }
+    }
+    return -1;
+}
 
 uint64_t get_current_time_in_nsec()
 {

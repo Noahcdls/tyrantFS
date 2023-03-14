@@ -17,5 +17,5 @@ uint64_t get_i_block(node *cur_node, uint64_t i);
 int remove_link_from_parent(uint64_t parent, uint64_t cur_node);
 int sub_unlink(uint64_t parent, uint64_t child);
 uint64_t get_current_time_in_nsec();
-
+int rename_from_parent(uint64_t parent, uint64_t cur_node, char* new_name);
 
