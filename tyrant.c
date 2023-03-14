@@ -21,8 +21,8 @@ uint8_t *memspace = NULL;
 */
 int tfs_mkdir(const char *path, mode_t m)
 {
-	printf("Starting mkdir\n");
-    printf("CALLING MKDIR with path %s\n\n", path);
+	//printf("Starting mkdir\n");
+    //printf("CALLING MKDIR with path %s\n\n", path);
     node parent_node;
     uint64_t parent = 0;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1));
@@ -100,13 +100,13 @@ int tfs_mkdir(const char *path, mode_t m)
         return -1;
     }
     free(temp);
-    printf("FINISHED MKDIR\n");
+    //printf("FINISHED MKDIR\n");
     return result;
 }
 
 int tfs_mknod(const char *path, mode_t m, dev_t d)
 {
-	printf("Startind mknod\n");
+	//printf("Startind mknod\n");
     uint64_t parent = 0;
     char *temp = malloc(sizeof(char) * (strlen(path) + 1)); // for us to hold path
 
@@ -147,7 +147,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     // what mode_t means
     // dev_t is device ID
     data_node.mode = m; // definitions for mode can be found in sys/stat.h and bits/stat.h (bits for actual numerical value)
-    printf("\n\nStarting data node with mode %x\n\n", data_node.mode);
+    //printf("\n\nStarting data node with mode %x\n\n", data_node.mode);
     data_node.links = 0;
     data_node.blocks = 0;
     data_node.size = 0;
@@ -159,7 +159,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     data_node.change_time = data_node.creation_time;
     data_node.data_time = data_node.creation_time;
     commit_inode(&data_node, data);
-    printf("Adding %s as part of path %s\n", temp+i+1, (char*)path);
+    //printf("Adding %s as part of path %s\n", temp+i+1, (char*)path);
     int result = add_to_directory(parent, data, (temp + i + 1));
     if (result != 0)
     {
@@ -181,7 +181,7 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
 /// @return 0 success, -1 failure
 int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *fi)
 {
-	printf("Starting readdir\n");
+	//printf("Starting readdir\n");
 
     uint64_t dir_loc = find_path_node((char *)path);
     if (dir_loc == 0)
@@ -208,10 +208,10 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
         for (uint64_t i = 0; i < BLOCKSIZE && byte_count < total_bytes; i += PATH_BOUNDARY)
         {
             read_block(name, block, i, MAX_NAME_LENGTH);
-            printf("%s\n", name);
+            //printf("%s\n", name);
             byte_count += PATH_BOUNDARY;
             if (name[0] == '\0'){
-                printf("empty name\n");
+                //printf("empty name\n");
                 continue;
                 }
             filler(buffer, name, NULL, 0);
@@ -224,7 +224,7 @@ int tfs_readdir(const char *path, void *buffer, fuse_fill_dir_t filler, off_t of
 
 int tfs_open(const char *path, struct fuse_file_info *fi)
 {
-	printf("Starting open\n");
+	//printf("Starting open\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -247,7 +247,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
     }
     if (flags & cur_node.mode)
     {
-	printf("Permissions of open: %x\n", flags & cur_node.mode);
+	//printf("Permissions of open: %x\n", flags & cur_node.mode);
         // fi->fh = &cur_node; // fh is a uint64_t that can be used to store data during open or release
         // fh gets called when reading and writing so very useful to store inode address here
         return 0;
@@ -260,7 +260,7 @@ int tfs_open(const char *path, struct fuse_file_info *fi)
 /// @return 0 success, -1 failure
 int tfs_unlink(const char *path)
 {
-	printf("starting unlink\n");
+	//printf("starting unlink\n");
     // first check if the pathname is valid
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
@@ -322,7 +322,7 @@ int tfs_unlink(const char *path)
     uint64_t tmp = 0;
     uint64_t total_blocks = cur_node.blocks;
     // if links count is 0, remove the file/directory
-    printf("Current links: %d\n", cur_node.links);
+    //printf("Current links: %d\n", cur_node.links);
     if (cur_node.links == 0)
     {
         // if it is a directory, unlink everything in it before freeing block
@@ -359,14 +359,14 @@ int tfs_unlink(const char *path)
         }
 
         // free the inode
-	printf("Freeing child inode");
+	//printf("Freeing child inode");
         free_inode(cur);
     }
     else
     {
         commit_inode(&cur_node, cur);
     }
-    printf("Done unlinking\n");
+    //printf("Done unlinking\n");
     return 0;
 }
 
@@ -383,13 +383,13 @@ int tfs_rmdir(const char * path){
 /// @return amount of actually read data
 int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	printf("starting read\n");
+	//printf("starting read\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)//
         return -ENOENT;
     node cur_node;
     fetch_inode(cur, &cur_node);
-    printf("READING\n\n");
+    //printf("READING\n\n");
     uint64_t total_bytes = cur_node.size;
     uint64_t total_blocks = cur_node.blocks;
     uint64_t bytes = 0;
@@ -411,7 +411,7 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
         loc = 0;
         blocks++;
     }
-    printf("READ %lu BYTES\n\n", bytes);
+    //printf("READ %lu BYTES\n\n", bytes);
     return bytes;
 }
 
@@ -424,13 +424,13 @@ int tfs_read(const char *path, char *buff, size_t size, off_t offset, struct fus
 /// @return amount of actually written data
 int tfs_write(const char *path, const char *buff, size_t size, off_t offset, struct fuse_file_info *fi)
 {
-	printf("Starting write\n");
+	//printf("Starting write\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
     node cur_node;
     fetch_inode(cur, &cur_node);
-    printf("WRITING. CURRENTLY HAS %lu blocks. REQUESTING %lu BYTES\n\n", cur_node.blocks, size);
+    //printf("WRITING. CURRENTLY HAS %lu blocks. REQUESTING %lu BYTES\n\n", cur_node.blocks, size);
     uint64_t total_bytes = cur_node.size;
     uint64_t total_blocks = cur_node.blocks;
     uint64_t bytes = 0;
@@ -459,20 +459,20 @@ int tfs_write(const char *path, const char *buff, size_t size, off_t offset, str
         block = get_i_block(&cur_node, blocks);
         tmp = write_block((uint8_t *)(buff + bytes), block, loc, byte_counter); // see how many bytes we were able to write
         bytes += tmp;                                                           // increase bytes written
-        printf("BYTES LEFT %lu\n\n", bytes);
+        //printf("BYTES LEFT %lu\n\n", bytes);
         byte_counter -= tmp; // decrease bytes left to write
         loc = 0;             // loc = 0 virtually every time except the first time of the loop where offset can start not at block beginning
         blocks++;            // increment to next block we plan to fetch
     }
     cur_node.size = total_bytes > (uint64_t)offset + bytes ? total_bytes : (uint64_t)offset + bytes;
     commit_inode(&cur_node, cur);
-    printf("FINISHED WRITING %lu BYTES\n\n", bytes);
+    //printf("FINISHED WRITING %lu BYTES\n\n", bytes);
     return bytes;
 }
 
 int tfs_truncate(const char *path, off_t length)
 {
-	printf("Starting truncate\n");
+	//printf("Starting truncate\n");
     uint64_t cur = find_path_node((char *)path);
     if (cur == 0)
         return -ENOENT;
@@ -497,11 +497,11 @@ int tfs_truncate(const char *path, off_t length)
 }
 
 int tfs_getattr(const char * path, struct stat * st){
-    printf("getting attribute\n");
+    //printf("getting attribute\n");
     uint64_t cur = find_path_node((char *)path);
-    printf("Cur node location is %ld\n", cur);
+    //printf("Cur node location is %ld\n", cur);
     if(cur == 0){
-        printf("%s NOT FOUND\n\n", path);
+        //printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
     node cur_node;
@@ -511,8 +511,8 @@ int tfs_getattr(const char * path, struct stat * st){
 
     st->st_ino = (uint64_t)(cur - BLOCKSIZE)/INODE_SIZE_BOUNDARY;
     st->st_mode = cur_node.mode;
-    //printf("cur node is DIR? %x %x\n", (cur_node.mode), S_IFDIR);
-    //printf("IS DIR? %x\n", (st->st_mode & S_IFDIR)); 
+    ////printf("cur node is DIR? %x %x\n", (cur_node.mode), S_IFDIR);
+    ////printf("IS DIR? %x\n", (st->st_mode & S_IFDIR)); 
     st->st_nlink = cur_node.links;
     st->st_size = cur_node.size;
     st->st_blocks = cur_node.blocks;
@@ -523,14 +523,14 @@ int tfs_getattr(const char * path, struct stat * st){
     st->st_atime = (time_t)cur_node.access_time;
     st->st_mtime = (time_t)cur_node.data_time;
     st->st_ctime = (time_t)cur_node.change_time;
-    printf("Returning stat for %s\n", (char*)path);
+    //printf("Returning stat for %s\n", (char*)path);
     return 0;
 }
 
 int tfs_utime(const char *path, struct utimbuf *tv){
     uint64_t cur = find_path_node((char *)path);
     if(cur == 0){
-        printf("%s NOT FOUND\n\n", path);
+        //printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
 
@@ -551,7 +551,7 @@ int tfs_flush(const char *path, struct fuse_file_info *fi)
 int tfs_chmod(const char * path, mode_t m){
     uint64_t cur = find_path_node((char *)path);
     if(cur == 0){
-        printf("%s NOT FOUND\n\n", path);
+        //printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
 
@@ -566,7 +566,7 @@ int tfs_chmod(const char * path, mode_t m){
 int tfs_chown(const char * path, uid_t owner, gid_t group){
     uint64_t cur = find_path_node((char *)path);
     if(cur == 0){
-        printf("%s NOT FOUND\n\n", path);
+        //printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
     }
 
@@ -666,16 +666,16 @@ static const struct fuse_operations operations = {
 int main(int argc, char **argv)
 {
     if (argc < 3){
-	printf("Not enough args. Add a directory path\n");
+	//printf("Not enough args. Add a directory path\n");
         return -1;
     }
     char * path = argv[argc-1];
     int fd = open(path, O_RDWR, 0666);
     if (fd < 0){
-        printf("\n\nFailed to open %s\n\n", path);
+        //printf("\n\nFailed to open %s\n\n", path);
         return fd;
         }
     tfs_disk_info(fd);
-    printf("Starting up FUSE in %s\n", path);
+    //printf("Starting up FUSE in %s\n", path);
     return fuse_main(argc -1, argv, &operations);
 }

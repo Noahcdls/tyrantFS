@@ -37,11 +37,11 @@ int tfs_mkfs(int fd)
     inode_blocks = num_blocks / 65; // following ext4 standard of 1 inode for every 16KB of data or 1 inode block for every 64 data blocks
     data_blocks = inode_blocks * 64 - 1;//leave 1 for superblock
     inode_byte_boundary = (inode_blocks + 1) * BLOCKSIZE;
-    printf("Drive is %.3f GB and has %ld blocks!\ninode blocks: %ld\ndata blocks: %ld\n\n", (float)drivesize/1024/1024/1024, num_blocks, inode_blocks, data_blocks);
+    //print("Drive is %.3f GB and has %ld blocks!\ninode blocks: %ld\ndata blocks: %ld\n\n", (float)drivesize/1024/1024/1024, num_blocks, inode_blocks, data_blocks);
     lseek(fd, 0, SEEK_SET);
     for (uint64_t i = 0; i < inode_blocks + 1; i++) // clear out inodes and super block
         write(fd, buff, BLOCKSIZE);
-    printf("Cleared out inodes and super block");
+    //print("Cleared out inodes and super block");
     lseek(fd, 0, SEEK_SET);
     write(fd, &inode_byte_boundary, ADDR_LENGTH); // superblock holds first free block address
 
@@ -53,7 +53,7 @@ int tfs_mkfs(int fd)
         lseek(fd, free_blockptr, SEEK_SET); // seek to beginning of block
         write(fd, buff, BLOCKSIZE);         // clear out block
         lseek(fd, -BLOCKSIZE, SEEK_CUR);    // go back to beginning
-	//printf("Free block ptr is at %ld\n", free_blockptr);
+	////print("Free block ptr is at %ld\n", free_blockptr);
 	//sleep(1);
         block_ptr = inode_byte_boundary + addr_counter * BLOCKSIZE + BLOCKSIZE; // next free block
         for (uint64_t i = 0; i < BLOCKSIZE; i += 8)                             // write one full block
@@ -72,18 +72,18 @@ int tfs_mkfs(int fd)
 	//printf("New block pointer %ld\n", free_blockptr);
     }
 
-    printf("Finished writing in data blocks\n");
+    //print("Finished writing in data blocks\n");
     root_node = allocate_inode(fd);
     node temp_node;
-    printf("Allocated a root at %ld!\n", root_node);
+    //print("Allocated a root at %ld!\n", root_node);
     lseek(fd, root_node, SEEK_SET);
     read(fd, &temp_node, sizeof(node));
     temp_node.mode = S_IFDIR | S_IRUSR | S_IRGRP | S_IROTH; // User, group, and other can only read
-    printf("Temp node mode %x\n", temp_node.mode);
+    //print("Temp node mode %x\n", temp_node.mode);
     temp_node.access_time = (uint64_t)time(NULL);
     temp_node.creation_time = (uint64_t)time(NULL);
     uint64_t block = allocate_block(drive);
-    printf("Block is at %ld\n", block);
+    //print("Block is at %ld\n", block);
     temp_node.direct_blocks[0] = block;
     char path1[] = ".";
     char path2[] = "..";
@@ -95,17 +95,17 @@ int tfs_mkfs(int fd)
     write_block(&root_node, block, NAME_BOUNDARY * 2 - ADDR_LENGTH, ADDR_LENGTH); // write root_node address
 
     read_block(buff, block, NAME_BOUNDARY-ADDR_LENGTH, ADDR_LENGTH);
-    printf("Double checking . for root node that %ld == %ld\n", root_node,* (uint64_t*)buff);
+    //print("Double checking . for root node that %ld == %ld\n", root_node,* (uint64_t*)buff);
     read_block(buff, block, NAME_BOUNDARY+NAME_BOUNDARY-ADDR_LENGTH, ADDR_LENGTH);
-    printf("Double checking .. for root node that %ld == %ld\n", root_node, *(uint64_t*)buff);
+    //print("Double checking .. for root node that %ld == %ld\n", root_node, *(uint64_t*)buff);
     temp_node.data_time = time(NULL);
     temp_node.size = NAME_BOUNDARY * 2;
     temp_node.blocks = 1;
     temp_node.links = 1;
     commit_inode(&temp_node, root_node);
     fetch_inode(root_node, &temp_node);
-    printf("double check mode %x\n", temp_node.mode);
-    printf("Finished making FS\n");
+    //print("double check mode %x\n", temp_node.mode);
+    print("Finished making FS\n");
     return 0;
 }
 
@@ -138,16 +138,16 @@ uint64_t allocate_inode(int fd)
     if (drive < 0)
         return 0;
     uint64_t sought_to = lseek(drive, BLOCKSIZE, SEEK_SET);
-    printf("Moving head initially to %lx\n", sought_to);
+    //print("Moving head initially to %lx\n", sought_to);
     node *inode_ptr = malloc(sizeof(node));
     for (uint64_t i = BLOCKSIZE; i < inode_byte_boundary; i += INODE_SIZE_BOUNDARY)
     {
 	sought_to = lseek(drive, i, SEEK_SET);
-	printf("Seeking to %lx\n", sought_to);
+	//print("Seeking to %lx\n", sought_to);
         uint64_t bytes_read = read(drive, inode_ptr, sizeof(node)); // read ptr automatically shifts us up to next inode
         if (inode_ptr->mode == 0)
         { // cleared mode means not in use
-	    printf("\n\nAllocating inode at address %lx. Read %lx bytes\n\n", i, bytes_read);
+	    //print("\n\nAllocating inode at address %lx. Read %lx bytes\n\n", i, bytes_read);
             free(inode_ptr);
             return i;
         }
@@ -171,7 +171,7 @@ int free_inode(uint64_t cur_node)
     write(drive, buff, INODE_SIZE_BOUNDARY);
     node cur;
     fetch_inode(cur_node, &cur);
-    printf("FREED: Mode = %x\n", cur.mode);
+    //print("FREED: Mode = %x\n", cur.mode);
     return 0;
 }
 
@@ -507,20 +507,20 @@ void *fetch_inode(uint64_t my_node, void *buff)
     if (my_node == 0)
         return NULL;
    lseek(drive, my_node, SEEK_SET);
-   // printf("Fetched inode at offset %ld\n", sought_to);
+   // //print("Fetched inode at offset %ld\n", sought_to);
    read(drive, buff, sizeof(node));
-   // printf("Read %ld bytes to fetch inode\n", bytes);
-   // printf("Size of node is %ld\n", sizeof(node));
+   // //print("Read %ld bytes to fetch inode\n", bytes);
+   // //print("Size of node is %ld\n", sizeof(node));
     return buff;
 }
 
 int commit_inode(node *my_node, uint64_t node_loc)
 {
    lseek(drive, node_loc, SEEK_SET);
-   // printf("Sought to %ld for committing node\n", sought_to);
+   // //print("Sought to %ld for committing node\n", sought_to);
    uint64_t bytes = write(drive, my_node, sizeof(node));
-   // printf("Wrote %ld bytes to commit node\n", bytes);
-   // printf("Size of node is %ld\n", sizeof(node));
+   // //print("Wrote %ld bytes to commit node\n", bytes);
+   // //print("Size of node is %ld\n", sizeof(node));
     return bytes;
     
 }

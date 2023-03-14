@@ -20,3 +20,6 @@ int tfs_truncate(const char * path, off_t length);
 int tfs_unlink(const char *path);
 int tfs_rmdir(const char * path);
 int tfs_utime(const char *path, struct utimbuf *tv);
+int tfs_chmod(const char * path, mode_t m);
+int tfs_chown(const char * path, uid_t owner, gid_t group);
+int tfs_rename(const char * path, const char * new_name);
