@@ -38,8 +38,8 @@ int tfs_mkdir(const char *path, mode_t m)
     }
 
     temp[i] = 0; // terminate at / for full path
-    if(isalnum(*(temp + i + 1)) == 0)
-	    return -EBADF;
+    //if(isalnum(*(temp + i + 1)) == 0)
+//	    return -EBADF;
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else
@@ -121,8 +121,8 @@ int tfs_mknod(const char *path, mode_t m, dev_t d)
     }
 
     temp[i] = 0; // terminate at / for full path
-    if(isalnum(*(temp + i +1)) == 0)
-	    return -EBADF;
+  //  if(isalnum(*(temp + i +1)) == 0)
+//	    return -EBADF;
     if (i != 0) // '/' or root is the first byte
         parent = find_path_node(temp);
     else

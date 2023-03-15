@@ -105,7 +105,7 @@ int tfs_mkfs(int fd)
     commit_inode(&temp_node, root_node);
     fetch_inode(root_node, &temp_node);
     //print("double check mode %x\n", temp_node.mode);
-    print("Finished making FS\n");
+    printf("Finished making FS\n");
     return 0;
 }
 
