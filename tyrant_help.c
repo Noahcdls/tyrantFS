@@ -2,30 +2,30 @@
 
 uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
 {
-	printf("Adding block to node\n");
+	//print("Adding block to node\n");
     if (parent == NULL || parent_loc == 0)
     {
-        printf("NULL PARENT\n\n");
+        //print("NULL PARENT\n\n");
         return 0;
     }
     uint64_t block = allocate_block(drive);
     if (block == 0)
     {
-        printf("NO MORE BLOCKS: ADD BLOCK TO NODE\n\n"); //
+        //print("NO MORE BLOCKS: ADD BLOCK TO NODE\n\n"); //
         return 0;
     }
     if (parent->blocks == UINT64_MAX)
     {
-        printf("HIT MAX BLOCKS\n\n");
+        //print("HIT MAX BLOCKS\n\n");
         free_block(drive, block);
         return 0;
     }
-    printf("INSERTING BLOCK\n\n");
+    //print("INSERTING BLOCK\n\n");
     uint64_t i = parent->blocks;
 
     if (i < 12) // direct
     {
-        printf("INSERTING INTO DIRECT\n\n");
+        //print("INSERTING INTO DIRECT\n\n");
         parent->direct_blocks[i] = block;
         parent->blocks++;
         commit_inode(parent, parent_loc);
@@ -33,7 +33,7 @@ uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH) // indirect
     {
-        printf("INSERTING INTO INDIRECT\n\n");
+        //print("INSERTING INTO INDIRECT\n\n");
         uint64_t indir_blk = parent->indirect_blocks;
         if (indir_blk == 0)
         {
@@ -55,7 +55,7 @@ uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
     }
     else if (i < 12 + BLOCKSIZE / ADDR_LENGTH + pow(BLOCKSIZE / ADDR_LENGTH, 2)) // double indirect
     {
-        printf("INSERTING INTO DBL INDIRECT\n\n");
+        //print("INSERTING INTO DBL INDIRECT\n\n");
         uint64_t indir_blk = 0;
         uint64_t dbl_blk = parent->dbl_indirect;
         if (dbl_blk == 0)
@@ -91,7 +91,7 @@ uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
     }
     else // triple indirect
     {
-        printf("INSERTING INTO TRPL INDIRECT\n\n");
+        //print("INSERTING INTO TRPL INDIRECT\n\n");
         uint64_t indir_blk = 0;
         uint64_t dbl_blk = 0;
         uint64_t trpl_blk = parent->trpl_indirect;
@@ -148,7 +148,7 @@ uint64_t add_block_to_node(node *parent, uint64_t parent_loc)
 /// @return 0 on success; -1 on failure
 int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
 {
-	printf("Removing link from parent\n");
+	//print("Removing link from parent\n");
     if (parent == 0)
         return -1;
     if (cur_node == 0)
@@ -172,7 +172,7 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
                 uint8_t name_slot[NAME_BOUNDARY];
                 bzero(name_slot, NAME_BOUNDARY);
                 write_block(name_slot, block, j, NAME_BOUNDARY);                         // remove old entry
-		printf("\n\nRemoved inode %lx from address %lx\n\n", cur_node, j+NAME_BOUNDARY-ADDR_LENGTH);
+		//print("\n\nRemoved inode %lx from address %lx\n\n", cur_node, j+NAME_BOUNDARY-ADDR_LENGTH);
                 uint64_t last_block = get_i_block(&parent_node, parent_node.blocks - 1); // get last block for last entry
                 if (last_block == 0)
                     return -1;
@@ -200,7 +200,7 @@ int remove_link_from_parent(uint64_t parent, uint64_t cur_node)
 
 int sub_unlink(uint64_t parent, uint64_t child)
 {
-	printf("Performing sub unlink\n");
+	//print("Performing sub unlink\n");
     // remove link from its parent
     if (parent == 0 || child == 0)
         return -1;
@@ -270,7 +270,7 @@ int sub_unlink(uint64_t parent, uint64_t child)
 /// @return pointer to ith block success, NULL failure
 uint64_t get_i_block(node *cur_node, uint64_t i)
 {
-	printf("Getting ith block\n");
+	//print("Getting ith block\n");
     // curnode cannot be NULL
     if (cur_node == NULL)
     {
@@ -356,9 +356,9 @@ uint64_t get_i_block(node *cur_node, uint64_t i)
 /// @return 0 success, -1 failure
 int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
 {
-	printf("\n\nAdding address\n\n");
+	//print("\n\nAdding address\n\n");
     if (block == 0 || parent == 0 || addr == 0){
-        printf("Bad arguments for add address\n\n");
+        //print("Bad arguments for add address\n\n");
         return -1;
         }
     char temp[NAME_BOUNDARY - ADDR_LENGTH];
@@ -374,11 +374,11 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
         read_block(&empty_space, block, i, 1);                        // grab a single byte. If that byte is 0, that means the name slot is empty
         if (empty_space == 0)                                         // nothing written here
         {                                                             // no name so can write over
-            printf("Writing name %s\n", temp);
+            //print("Writing name %s\n", temp);
             write_block(temp, block, i, NAME_BOUNDARY - ADDR_LENGTH); // write name
-            printf("\n\nWriting %s's address %ld at location %lx\n\n", name, addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
+            //print("\n\nWriting %s's address %ld at location %lx\n\n", name, addr, block + i + NAME_BOUNDARY - ADDR_LENGTH);
             write_block(&addr, block, i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
-            printf("\n\n%ld added as address\n\n", addr);
+            //print("\n\n%ld added as address\n\n", addr);
             parent_node.size += NAME_BOUNDARY;
             addr_node.links++;
             parent_node.data_time = get_current_time_in_nsec();
@@ -386,7 +386,7 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
             addr_node.change_time = parent_node.data_time;
             commit_inode(&parent_node, parent);
             commit_inode(&addr_node, addr);
-            printf("\n\nFinished adding address\n\n");
+            //print("\n\nFinished adding address\n\n");
             return 0;
         }
     }
@@ -401,7 +401,7 @@ int add_addr(uint64_t parent, uint64_t block, uint64_t addr, char *name)
 */
 int add_to_directory(uint64_t parent, uint64_t child, char *name)
 {
-	printf("Adding to directory\n");
+	//print("Adding to directory\n");
     if (parent == 0 || child == 0){
         return -1;
         }
@@ -421,7 +421,7 @@ int add_to_directory(uint64_t parent, uint64_t child, char *name)
         return add_addr(parent, block, child, name);
     }
     block = get_i_block(&parent_node, parent_node.blocks - 1);
-    printf("Going to add child to block %ld\n", block);
+    //print("Going to add child to block %ld\n", block);
     return add_addr(parent, block, child, name);
 
     return 0;
@@ -436,7 +436,7 @@ and return address
 */
 uint64_t check_block(uint8_t *block, char *name)
 {
-    printf("Searching for %s\n", name);
+    //print("Searching for %s\n", name);
     if (block == NULL)
         return 0;
     char tmp_name[NAME_BOUNDARY - ADDR_LENGTH + 1];
@@ -448,9 +448,9 @@ uint64_t check_block(uint8_t *block, char *name)
         if (strcmp(tmp_name, name) == 0) // found a match in the name
         {
             uint64_t node_ptr = 0;
-            printf("Reading address at location %p\n", block + i + NAME_BOUNDARY - ADDR_LENGTH);
+            //print("Reading address at location %p\n", block + i + NAME_BOUNDARY - ADDR_LENGTH);
             memcpy(&node_ptr, block + i + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH); // write address
-            printf("Return with address %ld\n", node_ptr);
+            //print("Return with address %ld\n", node_ptr);
             return node_ptr;
         }
     }
@@ -466,7 +466,7 @@ uint64_t check_block(uint8_t *block, char *name)
 */
 uint64_t check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
-	printf("Checking indirect block");
+	//print("Checking indirect block");
     if (block == NULL)
         return 0;
     uint64_t tmp_node = 0;
@@ -503,7 +503,7 @@ uint64_t check_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 */
 uint64_t check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
-	printf("Checking dbl indirect\n");
+	//print("Checking dbl indirect\n");
     if (block == NULL)
         return 0;
     uint64_t tmp_node = 0;
@@ -539,7 +539,7 @@ uint64_t check_dbl_indirect_blk(uint8_t *block, char *name, uint64_t *block_coun
 */
 uint64_t check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_count)
 {
-	printf("Checking trpl indirect\n");
+	//print("Checking trpl indirect\n");
     if (block == NULL)
         return 0;
     uint64_t tmp_node = 0;
@@ -572,19 +572,19 @@ uint64_t check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_cou
 */
 uint64_t find_path_node(char *path)
 {
-	printf("Finding path\n");
+	//print("Finding path\n");
     char cpy_path[NAME_BOUNDARY], *node_name;
 
     if (root_node == 0)
     {
-        printf("NULL ROOT\n");
+        //print("NULL ROOT\n");
         return 0;
     }
     node *cur_node = malloc(sizeof(node));
     uint8_t *tmp_block = malloc(BLOCKSIZE);
     uint64_t tmp_node = root_node;
     if (fetch_inode(root_node, cur_node) == NULL){
-	printf("Could not get root\n");
+	//print("Could not get root\n");
         return 0;
     }
 
@@ -592,15 +592,15 @@ uint64_t find_path_node(char *path)
     node_name = strtok(cpy_path, "/");
     while (node_name != 0) // should break this loop if you find the full path
     {
-        printf("%s is the current file/dir we are looking for\n", node_name);
+        //print("%s is the current file/dir we are looking for\n", node_name);
         tmp_node = 0;
         uint64_t block_cnt = cur_node->blocks; // check how many blocks inode uses to limit blocks checked
-        printf("Current inode has %ld blocks\n", block_cnt);
+        //print("Current inode has %ld blocks\n", block_cnt);
         for (int i = 0; i < 12; i++)
         {
             if (block_cnt == 0)
             { // no more blocks means you didnt find out
-                printf("Node has no more blocks\n");
+                //print("Node has no more blocks\n");
                 free(cur_node);
                 return 0;
             }
@@ -686,6 +686,47 @@ uint64_t find_path_node(char *path)
     return tmp_node;
 }
 
+int rename_from_parent(uint64_t parent, uint64_t cur_node, char* new_name)
+{
+	//print("Removing link from parent\n");
+    if (parent == 0)
+        return -1;
+    if (cur_node == 0)
+        return -1;
+    uint64_t child = 0;
+    uint64_t block = 0;
+    uint8_t entry_data[NAME_BOUNDARY];
+    node parent_node;
+    fetch_inode(parent, &parent_node);
+
+    for (int i = 0; i < parent_node.blocks; i++)
+    {
+        block = get_i_block(&parent_node, i);
+        if (block == 0)
+            return -1;
+        for (int j = 0; j < BLOCKSIZE && j + i * BLOCKSIZE < parent_node.size; j += NAME_BOUNDARY)
+        {
+            read_block(&child, block, j + NAME_BOUNDARY - ADDR_LENGTH, ADDR_LENGTH);
+            if (child == cur_node)
+            {
+                uint8_t name_slot[NAME_BOUNDARY-ADDR_LENGTH];
+                bzero(name_slot, NAME_BOUNDARY-ADDR_LENGTH);
+                write_block(name_slot, block, j, NAME_BOUNDARY-ADDR_LENGTH);                        	  
+		uint64_t name_size = strlen((const char *) new_name);
+		if(name_size >= NAME_BOUNDARY-ADDR_LENGTH)
+			name_size = NAME_BOUNDARY-ADDR_LENGTH;
+		write_block(new_name, block, j, name_size);
+		read_block(name_slot, block, j, NAME_BOUNDARY-ADDR_LENGTH);
+		//print("RENAMED SLOT %s\n\n", name_slot);
+                parent_node.data_time = get_current_time_in_nsec();
+                parent_node.change_time = parent_node.data_time;
+                commit_inode(&parent_node, parent);
+                return 0;
+            }
+        }
+    }
+    return -1;
+}
 
 uint64_t get_current_time_in_nsec()
 {
