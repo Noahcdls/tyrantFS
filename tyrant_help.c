@@ -236,7 +236,7 @@ int sub_unlink(uint64_t parent, uint64_t child)
                         continue;//no need to unlink . or ..
                     read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
                     // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
-
+		   // if(child != tmp)
                     sub_unlink(child, tmp);
                 }
 
@@ -443,8 +443,8 @@ uint64_t check_block(uint8_t *block, char *name)
     for (int i = 0; i < BLOCKSIZE; i += NAME_BOUNDARY)
     {
         memcpy(&tmp_name, block + i, NAME_BOUNDARY - ADDR_LENGTH); // copy name
-        //printf("The name is copied is %s\n", tmp_name);
-        // printf("%s is %d\n", tmp_name, strcmp(tmp_name, name));
+        //printf("The name is copied is %s len %ld. Real name is %s len %ldn", tmp_name, strlen(tmp_name), name, strlen(name));
+        //printf("%s is %d\n", tmp_name, strcmp(tmp_name, name));
         if (strcmp(tmp_name, name) == 0) // found a match in the name
         {
             uint64_t node_ptr = 0;
@@ -572,8 +572,8 @@ uint64_t check_trpl_indirect_blk(uint8_t *block, char *name, uint64_t *block_cou
 */
 uint64_t find_path_node(char *path)
 {
-	//print("Finding path\n");
-    char cpy_path[NAME_BOUNDARY], *node_name;
+	printf("Finding path\n");
+    char cpy_path[strlen(path)+1], *node_name;
 
     if (root_node == 0)
     {
@@ -584,6 +584,8 @@ uint64_t find_path_node(char *path)
     uint8_t *tmp_block = malloc(BLOCKSIZE);
     uint64_t tmp_node = root_node;
     if (fetch_inode(root_node, cur_node) == NULL){
+      free(tmp_block);
+      free(cur_node);
 	//print("Could not get root\n");
         return 0;
     }
@@ -592,20 +594,22 @@ uint64_t find_path_node(char *path)
     node_name = strtok(cpy_path, "/");
     while (node_name != 0) // should break this loop if you find the full path
     {
-        //print("%s is the current file/dir we are looking for\n", node_name);
+        //printf("%s is the current file/dir we are looking for\n", node_name);
         tmp_node = 0;
         uint64_t block_cnt = cur_node->blocks; // check how many blocks inode uses to limit blocks checked
-        //print("Current inode has %ld blocks\n", block_cnt);
+        //printf("Current inode has %ld blocks\n", block_cnt);
         for (int i = 0; i < 12; i++)
         {
             if (block_cnt == 0)
             { // no more blocks means you didnt find out
-                //print("Node has no more blocks\n");
+              //  printf("Node has no more blocks\n");
+                free(tmp_block);
                 free(cur_node);
                 return 0;
             }
             if (cur_node->direct_blocks[i] == 0)
             { // bad case
+                free(tmp_block);
                 free(cur_node);
                 return 0;
             }
@@ -623,6 +627,7 @@ uint64_t find_path_node(char *path)
         if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
             fetch_inode(tmp_node, cur_node);
+	    //printf("calling tok1\n");
             node_name = strtok(NULL, "/");
             continue;
         }
@@ -638,7 +643,9 @@ uint64_t find_path_node(char *path)
         tmp_node = check_indirect_blk(tmp_block, node_name, &block_cnt);
         if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
+
             fetch_inode(tmp_node, cur_node);
+ 	    //printf("calling tok2\n");
             node_name = strtok(NULL, "/");
             continue;
         }
@@ -656,6 +663,7 @@ uint64_t find_path_node(char *path)
         if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
             fetch_inode(tmp_node, cur_node);
+ 	  //  printf("calling tok3\n");
             node_name = strtok(NULL, "/");
             continue;
         }
@@ -673,6 +681,7 @@ uint64_t find_path_node(char *path)
         if (tmp_node != 0) // broke out of for loop and have a valid inode
         {
             fetch_inode(tmp_node, cur_node);
+	    //printf("calling tok4\n");
             node_name = strtok(NULL, "/");
             continue;
         }
