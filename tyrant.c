@@ -337,10 +337,9 @@ int tfs_unlink(const char *path)
                     // get the address of the inode?
                     // char temp[NAME_BOUNDARY - ADDR_LENGTH];
                     if((i-1)*BLOCKSIZE+j-NAME_BOUNDARY == NAME_BOUNDARY || (i-1)*BLOCKSIZE+j-NAME_BOUNDARY == 0)
-                        continue;//no need to unlink . or ..
+                       continue;//no need to unlink . or ..
                     read_block(&tmp, block, j - ADDR_LENGTH, ADDR_LENGTH);
-                    // read_block(temp, block, j, NAME_BOUNDARY - ADDR_LENGTH);
-
+		  //  if(cur != tmp)
                     sub_unlink(cur, tmp);
                 }
 
@@ -497,9 +496,9 @@ int tfs_truncate(const char *path, off_t length)
 }
 
 int tfs_getattr(const char * path, struct stat * st){
-    //printf("getting attribute\n");
+   // printf("getting attribute\n");
     uint64_t cur = find_path_node((char *)path);
-    //printf("Cur node location is %ld\n", cur);
+   // printf("Cur node location is %ld\n", cur);
     if(cur == 0){
         //printf("%s NOT FOUND\n\n", path);
         return -ENOENT;
